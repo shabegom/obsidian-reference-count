@@ -29,7 +29,7 @@ function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
     const files = app.vault.getMarkdownFiles()
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
     if (blocks) {
-        const {lineStart} = ctx.getSectionInfo(val)
+        const {lineStart} = ctx.getSectionInfo(val) || {}
         Object.values(blocks).forEach((block) => {
             const blockRefs = getBlockReferences({app, block, files})
             if (blockRefs.count > 0) {
@@ -79,10 +79,12 @@ function createButtonElement({app, blockRefs, val }: CreateButtonElement): void 
 
 function createTable({app, val, files}: {app: App, val: HTMLElement, files: FileRef[]}) {
     const refTable = createEl("table", {cls: "ref-table"})
-    const headerRow = createEl("tr").appendChild(createEl("th", {text: "Notes"}))
+    const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
+    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference"}))
     const removeTable = createEl("tr").appendChild(createEl("button", {text: "❌"}))
     removeTable.on("click", "button", () => {val.removeChild(refTable)})
-    refTable.appendChild(headerRow)
+    refTable.appendChild(noteHeaderRow)
+    refTable.appendChild(lineHeaderRow)
     refTable.appendChild(removeTable)
     files.forEach(async ( fileRef ) => {
         const lineContent = await app.vault.cachedRead(fileRef.file).then(content => content.split("\n")[fileRef.line])
