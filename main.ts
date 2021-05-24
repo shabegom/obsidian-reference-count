@@ -40,8 +40,14 @@ export default class BlockRefCounter extends Plugin {
             }
           });
           if (count > 0 && parentBlock.position.start.line === sectionLine) {
-            const countEl = createEl("div", { cls: "count" });
+            const countEl = createEl("button", { cls: "count" });
             countEl.innerText = count.toString();
+            countEl.on("click", "button", () => {
+              const search = this.app.workspace.getLeavesOfType("search")[0];
+              search.view.setCollapseAll(false);
+              search.view.setQuery(parentBlock.id + "]]");
+              this.app.workspace.revealLeaf(search);
+            });
             val.appendChild(countEl);
           }
         });
