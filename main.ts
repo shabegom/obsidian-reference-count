@@ -5,8 +5,8 @@ export default class BlockRefCounter extends Plugin {
     console.log("loading plugin");
     this.registerMarkdownPostProcessor((val, ctx) => {
       const { blocks } = this.app.metadataCache.getCache(ctx.sourcePath);
-      const sectionLine = ctx.getSectionInfo(val).lineStart;
       if (blocks) {
+        const { lineStart } = ctx.getSectionInfo(val);
         let parentBlocks: BlockCache[] = [];
         for (const id in blocks) {
           if (blocks[id].path === ctx.sourcePath) {
@@ -39,7 +39,7 @@ export default class BlockRefCounter extends Plugin {
               }
             }
           });
-          if (count > 0 && parentBlock.position.start.line === sectionLine) {
+          if (count > 0 && parentBlock.position.start.line === lineStart) {
             const countEl = createEl("button", { cls: "count" });
             countEl.innerText = count.toString();
             countEl.on("click", "button", () => {
