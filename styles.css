@@ -1,7 +1,11 @@
 .count {
-  color: red;
   float: right;
   margin-top: -50px;
-  border: 1px solid gold;
+  border: 1px inset var(--text-accent);
   padding: 5px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
