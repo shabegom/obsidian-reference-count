@@ -1,4 +1,7 @@
-/* Sets all the text color to red! */
-body {
-    color: red;
+.count {
+  color: red;
+  float: right;
+  margin-top: -50px;
+  border: 1px solid gold;
+  padding: 5px;
 }
