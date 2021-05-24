@@ -8,13 +8,13 @@ export default class BlockRefCounter extends Plugin {
       const sectionLine = ctx.getSectionInfo(val).lineStart;
       if (blocks) {
         let parentBlocks: BlockCache[] = [];
-        let count = 0;
         for (const id in blocks) {
           if (blocks[id].path === ctx.sourcePath) {
             parentBlocks.push(blocks[id]);
           }
         }
         parentBlocks.forEach((parentBlock) => {
+          let count = 0;
           const files = this.app.vault.getMarkdownFiles();
           files.forEach((file) => {
             if (file.path !== ctx.sourcePath) {
