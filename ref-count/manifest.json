@@ -1,10 +1,10 @@
 {
   "id": "block-reference-count",
   "name": "Block Reference Counter",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "minAppVersion": "0.9.12",
   "description": "Shows the count of block references next to the block-id",
-  "author": "shabegom",
+  "author": "shabegom + murf",
   "authorUrl": "https://obsidian.md/about",
   "isDesktopOnly": false
 }

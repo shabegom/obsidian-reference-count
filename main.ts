@@ -1,4 +1,4 @@
-import { App, Plugin, BlockCache, LinkCache, Loc, EmbedCache, TFile, MarkdownPostProcessorContext, WorkspaceLeaf, ValueComponent, FileSystemAdapter } from "obsidian"
+import { App, Plugin, BlockCache, LinkCache, EmbedCache, TFile, MarkdownPostProcessorContext, ListItemCache } from "obsidian"
 declare module "obsidian" {
   interface View {
     setCollapseAll(collapse: boolean): void;
@@ -25,9 +25,20 @@ interface AddBlockReferences {
   val: HTMLElement
 }
 
+
 function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
     const files = app.vault.getMarkdownFiles()
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
+    const listSections = sections.filter(section => section.type === "list").map(section => {
+        const items: ListItemCache[] = []
+        listItems.forEach(item => {
+            if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
+                items.push(item)
+            }
+        })
+        return {section, items}
+    })
+    const listElements = val.querySelectorAll("li")
     if (blocks) {
         const {lineStart} = ctx.getSectionInfo(val) || {}
         Object.values(blocks).forEach((block) => {
@@ -35,21 +46,21 @@ function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
             if (blockRefs.count > 0) {
                 if (sections) {
                     sections.forEach(section => {
-                        if (section.id === block.id && section.position.start.line === lineStart) {
+                        if (section.id === block.id && lineStart === block.position.start.line) {
                             createButtonElement({app, blockRefs, val})
                         }
 
                     })
                 }
-                if (listItems) {
-                    listItems.forEach((listItem, index) => {
-                        const listElements = val.querySelectorAll("li")
-                        if (listItem.id === block.id) {
-                            if (listElements.item(index)) {
-                                createButtonElement({app, blockRefs, val: listElements.item(index)})
-
+                if (listItems && listElements.length > 0) {
+                    listSections.forEach((section) => {
+                        section.items.forEach(( listItem, index ) => {
+                            if (listItem.id === block.id && lineStart === section.section.position.start.line) {
+                                if (listElements.item(index)) {
+                                    createButtonElement({app, blockRefs, val: listElements.item(index)})
+                                }
                             }
-                        }
+                        })
                     })
                 }
             }
@@ -68,8 +79,8 @@ function createButtonElement({app, blockRefs, val }: CreateButtonElement): void 
     countEl.innerText = blockRefs.count.toString()
     const refTable: HTMLElement = createTable({app, val, files: Array.from(blockRefs.files)})
     countEl.on("click", "button", () => {
-        if (val.lastChild !== refTable) {
-            val.appendChild(refTable)
+        if (val.lastChild.previousSibling !== refTable) {
+            val.insertBefore(refTable, val.lastChild)
         } else {
             val.removeChild(refTable)
         }
@@ -80,8 +91,9 @@ function createButtonElement({app, blockRefs, val }: CreateButtonElement): void 
 function createTable({app, val, files}: {app: App, val: HTMLElement, files: FileRef[]}) {
     const refTable = createEl("table", {cls: "ref-table"})
     const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
-    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference"}))
-    const removeTable = createEl("tr").appendChild(createEl("button", {text: "❌"}))
+    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
+    const removeTable = createEl("button", {text: "❌" })
+    lineHeaderRow.appendChild(removeTable)
     removeTable.on("click", "button", () => {val.removeChild(refTable)})
     refTable.appendChild(noteHeaderRow)
     refTable.appendChild(lineHeaderRow)

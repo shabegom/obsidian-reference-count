@@ -1,16 +1,21 @@
 .count {
   float: right;
-  margin-top: -50px;
   border: 1px inset var(--text-accent);
   padding: 5px;
-  width: 30px;
-  height: 30px;
+  width: 25px;
+  height: 25px;
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+  left: 20px;
 }
 
 .count:hover {
   color: var(--text-muted);
   border: 1px inset var(--text-selection);
+}
+
+.ref-table {
+  margin-top: 10px;
 }

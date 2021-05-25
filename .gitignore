@@ -14,4 +14,4 @@ main.js
 data.json
 
 .DS_Store
-.zip
+*.zip

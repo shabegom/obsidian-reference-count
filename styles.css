@@ -18,4 +18,15 @@
 
 .ref-table {
   margin-top: 10px;
+  text-align: center;
+}
+
+.ref-table button {
+  background: transparent;
+  position: relative;
+  right: 45px;
+}
+
+.ref-table th {
+  min-width: 150px;
 }
