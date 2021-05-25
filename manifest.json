@@ -1,7 +1,7 @@
 {
   "id": "block-reference-count",
   "name": "Block Reference Counter",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "minAppVersion": "0.9.12",
   "description": "Shows the count of block references next to the block-id",
   "author": "shabegom + murf",
