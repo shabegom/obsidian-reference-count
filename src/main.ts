@@ -60,7 +60,7 @@ function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
             const val = section.el
             const getSectionInfo = (val: HTMLElement) => ({val, lineStart, lineEnd, text: ""})
 
-            addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
+            addBlockReferences({app: app, ctx: {getSectionInfo, sourcePath}, val })
         })
 
     }
