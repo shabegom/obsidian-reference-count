@@ -1,5 +1,5 @@
-import { App, EmbedCache, LinkCache, ListItemCache, EventRef, Plugin, TFile, TAbstractFile } from "obsidian"
-import { AddBlockReferences, CreateButtonElement, CountBlockReferences, FileRef, BlockRefs } from "./types"
+import { App, ListItemCache, EventRef, Plugin, } from "obsidian"
+import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
 import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "./indexer"
 
 export default class BlockRefCounter extends Plugin {

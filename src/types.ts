@@ -1,13 +1,9 @@
-import { App } from 'obsidian'
+import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache,  } from "obsidian"
 
-import {App, CachedMetaData, TFile} from 'obsidian'
-
-declare module "obsidian" {
-  interface App {
-      MetadataCache: {
-          metadataCache: 
-      }
-  }
+export interface AddBlockReferences {
+  app: App
+  ctx: MarkdownPostProcessorContext
+  val: HTMLElement
 }
 
 export interface CreateButtonElement {
@@ -16,24 +12,48 @@ export interface CreateButtonElement {
   val: HTMLElement
 }
 
-export interface CountBlockReferences {
-  app: App
-  block: BlockCache
-  files: TFile[]
-}
-
 export interface FileRef {
   file: TFile
   line: number
 }
 
-export interface BlockRefs {
-  count: number
-  files : Set<any>
+interface IndexItemReference {
+  file: TFile
+  line: number
 }
 
-export interface AddBlockReferences {
-  app: App
-  ctx: MarkdownPostProcessorContext
-  val: HTMLElement
+interface IndexItem {
+  count: number
+  id: string
+  file: TFile
+  references: Set<IndexItemReference>
+}
+
+export interface Index {
+  [id: string]: IndexItem
+}
+
+export interface EmbedOrLinkItem {
+  id: string
+  file: TFile
+  pos: number
+  page: string
+}
+
+
+
+interface PageItem {
+  embeds: EmbedOrLinkItem[]
+  links: EmbedOrLinkItem[]
+}
+
+export interface Pages {
+  [id: string]: PageItem
+}
+
+export interface BuildIndexObjects {
+  blocks: Record<string, BlockCache>
+  links: LinkCache[]
+  embeds: EmbedCache[]
+  file: TFile
 }
