@@ -4,7 +4,7 @@ import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
-    private layoutReady;
+    private layoutReady: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
 
@@ -44,7 +44,7 @@ function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
 
     if (blocks) {
-        const matchedBlock = Object.entries(blocks).find((eachBlock) => { if (eachBlock[1].position.start.line >= lineStart && eachBlock[1].position.start.line <= lineEnd) { return true } else { return false } })
+        const matchedBlock = Object.values(blocks).find((eachBlock) => { if (eachBlock.position.start.line >= lineStart && eachBlock.position.start.line <= lineEnd) { return true } else { return false } })
         if (matchedBlock) {
             console.log("markdownPostProcessor Block Ref section...")
             const blockRefs = getIndex()
@@ -62,7 +62,7 @@ function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
 
             Object.values(blocks).forEach((block) => {
                 const myId = `${thisFile.basename}^${block.id}`
-                if (blockRefs[myId]) {
+                if (blockRefs[myId] && blockRefs[myId].count > 0) {
                     if (sections) {
                         sections.forEach(section => {
                             if (section.id === block.id && lineStart === block.position.start.line) {

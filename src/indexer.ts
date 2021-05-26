@@ -10,23 +10,23 @@ export function getIndex() {
 
 export function updateIndex() {
     //console.log('updateIndex()')
-    Object.entries(index).forEach(eachItem => {
-        index[eachItem[0]].count = 0;
-        index[eachItem[0]].references.clear();
+    Object.keys(index).forEach(key => {
+        index[key].count = 0;
+        index[key].references.clear();
     })
-    Object.entries(pages).forEach(eachPage => {
-        eachPage[1].embeds.forEach(embed => {
-            const id = `${embed[3]}^${embed[0]}`;
+    Object.values(pages).forEach(eachPage => {
+        eachPage.embeds.forEach(embed => {
+            const id = `${embed.page}^${embed.id}`;
             if (index[id]) {
                 index[id].count++
-                index[id].references.add({ file: embed[1], line: embed[2] })
+                index[id].references.add({ file: embed.file, line: embed.pos })
             }
         })
-        eachPage[1].links.forEach(link => {
-            const id = `${link[3]}^${link[0]}`;
+        eachPage.links.forEach(link => {
+            const id = `${link.page}^${link.id}`;
             if (index[id]) {
                 index[id].count++
-                index[id].references.add({ file: link[1], line: link[2] })
+                index[id].references.add({ file: link.file, line: link.pos })
             }
         })
     })
@@ -67,12 +67,12 @@ export function buildIndexObjects({blocks, embeds, links, file}) {
             if (id) {
                 const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
                 foundEmbeds.push(
-                    [
+                    {
                         id,
                         file,
-                        embed.position.start.line,
+                        pos: embed.position.start.line,
                         page
-                    ]
+                    }
                 )
             }
         })
@@ -86,12 +86,12 @@ export function buildIndexObjects({blocks, embeds, links, file}) {
             if (id) {
                 const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
                 foundLinks.push(
-                    [
+                    {
                         id,
                         file,
-                        link.position.start.line,
+                        pos: link.position.start.line,
                         page
-                    ]
+                    }
                 )
             }
         })
