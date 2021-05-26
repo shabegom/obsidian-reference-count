@@ -1,33 +1,41 @@
-import { App, Plugin, BlockCache, LinkCache, EmbedCache, TFile, MarkdownPostProcessorContext, ListItemCache } from "obsidian"
-declare module "obsidian" {
-  interface View {
-    setCollapseAll(collapse: boolean): void;
-    setQuery(queryStr: string): void;
-  }
-}
+import { App, EmbedCache, LinkCache, ListItemCache, EventRef, Plugin } from "obsidian"
+import { AddBlockReferences, CreateButtonElement, CountBlockReferences, FileRef, BlockRefs } from './types'
+import {indexBlockReferences, buildIndexObjects, getIndex} from './indexer'
+
 
 export default class BlockRefCounter extends Plugin {
+    private cacheUpdate: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
-        this.registerMarkdownPostProcessor((val, ctx) => {
-            addBlockReferences({app: this.app, ctx, val}) 
+        		if (!this.app.workspace.layoutReady) {
+			this.app.workspace.on("layout-ready", async () => this.prepareIndexes());
+		} else {
+			indexBlockReferences({app: this.app})
+		}
+
+        this.cacheUpdate = this.app.metadataCache.on('changed', (file) => {
+            console.log('updating cache')
+            const {blocks, embeds, links} = this.app.metadataCache.getFileCache(file)
+            buildIndexObjects({blocks, embeds, links, file}) 
         })
+
+        this.registerMarkdownPostProcessor((val, ctx) => {
+            addBlockReferences({app: this.app, ctx, val})
+        })
+  
     }
 
     onunload() {
         console.log("unloading plugin: Block Reference Counter")
+        this.app.metadataCache.off(this.cacheUpdate)
     }
 }
 
-interface AddBlockReferences {
-  app: App
-  ctx: MarkdownPostProcessorContext
-  val: HTMLElement
-}
+
 
 
 function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
-    const files = app.vault.getMarkdownFiles()
+    const blockRefs = getIndex()
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
     const listSections = sections.filter(section => section.type === "list").map(section => {
         const items: ListItemCache[] = []
@@ -42,12 +50,11 @@ function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
     if (blocks) {
         const {lineStart} = ctx.getSectionInfo(val) || {}
         Object.values(blocks).forEach((block) => {
-            const blockRefs = getBlockReferences({app, block, files})
-            if (blockRefs.count > 0) {
+            if (blockRefs[block.id]) {
                 if (sections) {
                     sections.forEach(section => {
                         if (section.id === block.id && lineStart === block.position.start.line) {
-                            createButtonElement({app, blockRefs, val})
+                            createButtonElement({app, blockRefs: blockRefs[block.id], val})
                         }
 
                     })
@@ -57,7 +64,7 @@ function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
                         section.items.forEach(( listItem, index ) => {
                             if (listItem.id === block.id && lineStart === section.section.position.start.line) {
                                 if (listElements.item(index)) {
-                                    createButtonElement({app, blockRefs, val: listElements.item(index)})
+                                    createButtonElement({app, blockRefs: blockRefs[block.id], val: listElements.item(index)})
                                 }
                             }
                         })
@@ -68,16 +75,11 @@ function addBlockReferences({app, ctx, val }: AddBlockReferences): void {
     }
 }
 
-interface CreateButtonElement {
-  app: App
-  blockRefs: {count: number, files: Set<FileRef>}
-  val: HTMLElement
-}
 
 function createButtonElement({app, blockRefs, val }: CreateButtonElement): void {
     const countEl = createEl("button", { cls: "count" })
     countEl.innerText = blockRefs.count.toString()
-    const refTable: HTMLElement = createTable({app, val, files: Array.from(blockRefs.files)})
+    const refTable: HTMLElement = createTable({app, val, files: Array.from(blockRefs.references)})
     countEl.on("click", "button", () => {
         if (val.lastChild.previousSibling !== refTable) {
             val.insertBefore(refTable, val.lastChild)
@@ -113,54 +115,3 @@ function createTable({app, val, files}: {app: App, val: HTMLElement, files: File
 
 }
 
-
-
-interface CountBlockReferences {
-  app: App
-  block: BlockCache
-  files: TFile[]
-}
-
-interface FileRef {
-  file: TFile
-  line: number
-}
-
-interface BlockRefs {
-  count: number
-  files : Set<any>
-}
-
-
-function getBlockReferences({ app, block, files }: CountBlockReferences): BlockRefs {
-    return files.reduce((acc, file) => {
-        const { embeds, links } = app.metadataCache.getFileCache(
-            file
-        ) || {}
-        if (embeds) {
-            const embedRefs = embeds.reduce((acc, embed: EmbedCache) => {
-                if (embed.link.split("^")[1] === block.id) {
-                    acc.count++
-                    acc.files.push({file, line: embed.position.start.line})
-
-                }
-                return acc
-            }, {count: 0, files: [], lines: []})
-            acc.count += embedRefs.count
-            embedRefs.files.forEach(file => acc.files.add(file))
-        }
-        if (links) {
-            const linkRefs = links.reduce((acc, link: LinkCache) => {
-                if (link.link.split("^")[1] === block.id) {
-                    acc.count++
-                    acc.files.push({file, line: link.position.start.line})
-
-                }
-                return acc
-            }, {count: 0, files: [], lines: []})
-            acc.count += linkRefs.count
-            linkRefs.files.forEach(file => acc.files.add(file))
-        }
-        return acc
-    }, {count: 0, files: new Set()})
-}
