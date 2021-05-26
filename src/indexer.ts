@@ -4,7 +4,7 @@ import {CountBlockReferences, BlockRefs} from "./types"
 const index = {}
 
 export function getIndex() {
-    return index
+    return Object.assign({}, index)
 }
 
 export function updateIndex({update}) {

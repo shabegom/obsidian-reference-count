@@ -7,10 +7,10 @@ export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
-        		if (!this.app.workspace.layoutReady) {
-			this.app.workspace.on("layout-ready", async () => this.prepareIndexes());
+        if (!this.app.workspace.layoutReady) {
+			this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}));
 		} else {
-			indexBlockReferences({app: this.app})
+            indexBlockReferences({app: this.app})
 		}
 
         this.cacheUpdate = this.app.metadataCache.on('changed', (file) => {
