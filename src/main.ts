@@ -1,10 +1,11 @@
-import { App, ListItemCache, EventRef, Plugin, TFile} from "obsidian"
+import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView} from "obsidian"
 import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
 import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "./indexer"
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
     private layoutReady: EventRef;
+    private layoutChange: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
 
@@ -21,8 +22,17 @@ export default class BlockRefCounter extends Plugin {
             updateIndex()
         })
 
-        this.registerMarkdownPostProcessor((val, ctx) => {
-            addBlockReferences({app: this.app, ctx, val})
+        this.layoutChange = this.app.workspace.on("layout-change", () => {
+            const view = this.app.workspace.activeLeaf.view 
+            const sourcePath = view.file.path
+            const sections = view.previewMode.renderer.sections
+            sections.forEach(section => {
+                const lineStart = section.lineStart
+                const lineEnd = section.lineEnd
+                const val = section.el
+                const getSectionInfo = (val) => ({lineStart, lineEnd, text: ""})
+                addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
+            })
         })
   
     }
@@ -31,7 +41,7 @@ export default class BlockRefCounter extends Plugin {
         console.log("unloading plugin: Block Reference Counter")
         this.app.metadataCache.offref(this.cacheUpdate)
         this.app.workspace.offref(this.layoutReady)
-
+        this.app.workspace.offref(this.layoutChange)
     }
 }
 
