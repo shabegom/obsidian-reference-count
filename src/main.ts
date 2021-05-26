@@ -1,4 +1,4 @@
-import { App, ListItemCache, EventRef, Plugin, } from "obsidian"
+import { App, ListItemCache, EventRef, Plugin, TFile} from "obsidian"
 import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
 import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "./indexer"
 
@@ -27,7 +27,7 @@ export default class BlockRefCounter extends Plugin {
   
     }
 
-    onunload() {
+    onunload(): void {
         console.log("unloading plugin: Block Reference Counter")
         this.app.metadataCache.offref(this.cacheUpdate)
         this.app.workspace.offref(this.layoutReady)
@@ -45,7 +45,7 @@ function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
         if (matchedBlock) {
             console.log("markdownPostProcessor Block Ref section...")
             const blockRefs = getIndex()
-            const thisFile = app.vault.getAbstractFileByPath(ctx.sourcePath)
+            const thisFile = app.vault.getAbstractFileByPath(ctx.sourcePath) as TFile
             const listSections = sections.filter(section => section.type === "list").map(section => {
                 const items: ListItemCache[] = []
                 listItems.forEach(item => {

@@ -8,7 +8,7 @@ export interface AddBlockReferences {
 
 export interface CreateButtonElement {
   app: App
-  blockRefs: {count: number, files: Set<FileRef>}
+  blockRefs: IndexItem
   val: HTMLElement
 }
 
