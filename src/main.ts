@@ -29,12 +29,9 @@ export default class BlockRefCounter extends Plugin {
 
     onunload() {
         console.log("unloading plugin: Block Reference Counter")
-        this.app.metadataCache.off(this.cacheUpdate, () => {
-            console.log('cacheUpdate event unloaded')
-        })
-        this.app.workspace.off(this.layoutReady, () => {
-            console.log('layoutReady event unloaded')
-        })
+        this.app.metadataCache.offref(this.cacheUpdate)
+        this.app.workspace.offref(this.layoutReady)
+
     }
 }
 
