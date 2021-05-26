@@ -4,11 +4,12 @@ import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
+    private layoutReady;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
 
         if (!this.app.workspace.layoutReady) {
-            this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}))
+            this.layoutReady = this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}))
         } else {
             indexBlockReferences({app: this.app})
         }
@@ -28,22 +29,26 @@ export default class BlockRefCounter extends Plugin {
 
     onunload() {
         console.log("unloading plugin: Block Reference Counter")
-        this.app.metadataCache.off(this.cacheUpdate)
+        this.app.metadataCache.off(this.cacheUpdate, () => {
+            console.log('cacheUpdate event unloaded')
+        })
+        this.app.workspace.off(this.layoutReady, () => {
+            console.log('layoutReady event unloaded')
+        })
     }
 }
 
 function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
-    const { lineStart } = ctx.getSectionInfo(val) || {}
-    const { lineEnd } = ctx.getSectionInfo(val) || {}
+    const { lineStart, lineEnd } = ctx.getSectionInfo(val) || {}
     //console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
 
     if (blocks) {
         const matchedBlock = Object.entries(blocks).find((eachBlock) => { if (eachBlock[1].position.start.line >= lineStart && eachBlock[1].position.start.line <= lineEnd) { return true } else { return false } })
         if (matchedBlock) {
-            console.log('markdownPostProcessor Block Ref section...');
+            console.log("markdownPostProcessor Block Ref section...")
             const blockRefs = getIndex()
-            const thisFile = app.vault.getAbstractFileByPath(ctx.sourcePath);
+            const thisFile = app.vault.getAbstractFileByPath(ctx.sourcePath)
             const listSections = sections.filter(section => section.type === "list").map(section => {
                 const items: ListItemCache[] = []
                 listItems.forEach(item => {
@@ -56,7 +61,7 @@ function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
             const listElements = val.querySelectorAll("li")
 
             Object.values(blocks).forEach((block) => {
-                const myId = `${thisFile.basename}^${block.id}`;
+                const myId = `${thisFile.basename}^${block.id}`
                 if (blockRefs[myId]) {
                     if (sections) {
                         sections.forEach(section => {
