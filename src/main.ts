@@ -1,27 +1,21 @@
 import { App, EmbedCache, LinkCache, ListItemCache, EventRef, Plugin } from "obsidian"
-import { AddBlockReferences, CreateButtonElement, CountBlockReferences, FileRef, BlockRefs } from './types'
-import {indexBlockReferences, buildIndexObjects, getIndex} from './indexer'
+import { AddBlockReferences, CreateButtonElement, CountBlockReferences, FileRef, BlockRefs } from "./types"
+import {indexBlockReferences, buildIndexObjects, getIndex} from "./indexer"
 
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
-<<<<<<< HEAD:src/main.ts
-        		if (!this.app.workspace.layoutReady) {
-			this.app.workspace.on("layout-ready", async () => this.prepareIndexes());
-		} else {
-			indexBlockReferences({app: this.app})
-=======
-        if (!this.app.workspace.layoutReady) {
-			this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}));
-		} else {
-            indexBlockReferences({app: this.app})
->>>>>>> move-indexing:main.ts
-		}
 
-        this.cacheUpdate = this.app.metadataCache.on('changed', (file) => {
-            console.log('updating cache')
+        if (!this.app.workspace.layoutReady) {
+            this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}))
+        } else {
+            indexBlockReferences({app: this.app})
+        }
+
+        this.cacheUpdate = this.app.metadataCache.on("changed", (file) => {
+            console.log("updating cache")
             const {blocks, embeds, links} = this.app.metadataCache.getFileCache(file)
             buildIndexObjects({blocks, embeds, links, file}) 
         })
