@@ -14,6 +14,7 @@ export interface AddBlockReferences {
   mdCache: CachedMetadata
   listSections: any
   actView: View
+  blockRefs: Index
 }
 
 export interface CreateButtonElement {

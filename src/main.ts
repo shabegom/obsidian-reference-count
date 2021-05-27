@@ -78,17 +78,18 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }, ca
 
     const mdSections = view.previewMode?.renderer.sections
     if (sourcePath && mdSections) {
+        const blockRefs = getIndex()
         mdSections.forEach((section: { lineStart: number; lineEnd: number; el: HTMLElement; }) => {
             const lineStart = section.lineStart
             const lineEnd = section.lineEnd
             const val = section.el
             const getSectionInfo = (val: HTMLElement) => ({ val, lineStart, lineEnd, text: "" })
-            addBlockReferences({ app: app, ctx: { getSectionInfo, sourcePath }, val, mdCache: mdCache, listSections: listSections, actView: view })
+            addBlockReferences({ app: app, ctx: { getSectionInfo, sourcePath }, val, mdCache: mdCache, listSections: listSections, actView: view, blockRefs: blockRefs })
         })
     }
 }
 
-function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: AddBlockReferences): void {
+function addBlockReferences({ app, ctx, val, mdCache, listSections, actView, blockRefs }: AddBlockReferences): void {
     const { lineStart, lineEnd } = ctx.getSectionInfo(val) || {}
     //console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
     const { blocks, listItems, headings } = mdCache || {}
@@ -119,7 +120,6 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
     }
     if (matchedBlock.length > 0) {
         //console.log("addBlockReferences: matchedBlock: Ln-" + lineStart)
-        const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedBlock).forEach(eachBlock => {
             const myId = `${actView.file.basename}^${eachBlock.id}`
@@ -141,16 +141,14 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
         })
     } else if (matchedHeading.length > 0) {
         //console.log("addBlockReferences: matchedHeading: Ln-" + lineStart)
-        const headerRefs = getIndex()
         Object.values(matchedHeading).forEach(eachHead => {
             const myId = `${actView.file.basename}#${eachHead.heading}`
-            if (headerRefs[myId] && headerRefs[myId].count >= 0) {
-                createButtonElement({ app, blockRefs: headerRefs[myId], val })
+            if (blockRefs[myId] && blockRefs[myId].count >= 0) {
+                createButtonElement({ app, blockRefs: blockRefs[myId], val })
             }
         })
     } else if (matchedEmbed.length > 0) {
         //console.log("addBlockReferences: matchedEmbed: Ln-" + lineStart)
-        const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedEmbed).forEach(eachEmbed => {
             let myId: string
@@ -177,7 +175,6 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
         })
     } else if (matchedLink.length > 0) {
         //console.log("addBlockReferences: matchedLink: Ln-" + lineStart)
-        const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedLink).forEach(eachLink => {
             let myId: string
