@@ -21,7 +21,7 @@ export default class BlockRefCounter extends Plugin {
             const {blocks, embeds, links} = this.app.metadataCache.getFileCache(file)
             buildIndexObjects({ blocks, embeds, links, file })
             updateIndex()
-            createPreviewView({app: this.app})
+            //createPreviewView({app: this.app})
         })
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
@@ -35,7 +35,7 @@ export default class BlockRefCounter extends Plugin {
         })
 
         this.registerMarkdownPostProcessor((val, ctx) => {
-            addBlockReferences({app: this.app, ctx, val})
+            //addBlockReferences({app: this.app, ctx, val})
         })
   
     }
