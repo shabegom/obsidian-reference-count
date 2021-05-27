@@ -118,7 +118,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
         }
     }
     if (matchedBlock.length > 0) {
-        console.log("addBlockReferences: matchedBlock: Ln-" + lineStart)
+        //console.log("addBlockReferences: matchedBlock: Ln-" + lineStart)
         const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedBlock).forEach(eachBlock => {
@@ -140,7 +140,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
             }
         })
     } else if (matchedHeading.length > 0) {
-        console.log("addBlockReferences: matchedHeading: Ln-" + lineStart)
+        //console.log("addBlockReferences: matchedHeading: Ln-" + lineStart)
         const headerRefs = getIndex()
         Object.values(matchedHeading).forEach(eachHead => {
             const myId = `${actView.file.basename}#${eachHead.heading}`
@@ -149,7 +149,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
             }
         })
     } else if (matchedEmbed.length > 0) {
-        console.log("addBlockReferences: matchedEmbed: Ln-" + lineStart)
+        //console.log("addBlockReferences: matchedEmbed: Ln-" + lineStart)
         const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedEmbed).forEach(eachEmbed => {
@@ -176,7 +176,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
             }
         })
     } else if (matchedLink.length > 0) {
-        console.log("addBlockReferences: matchedLink: Ln-" + lineStart)
+        //console.log("addBlockReferences: matchedLink: Ln-" + lineStart)
         const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedLink).forEach(eachLink => {
