@@ -126,7 +126,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
                 if (listItems && listElements.length > 0) {
                     listSections.forEach((section) => {
                         section.items.forEach((listItem, index) => {
-                            if (listItem.id === eachBlock.id && lineStart === section.section.position.start.line) {
+                            if (listItem.id === eachEmbed.id && lineStart === section.section.position.start.line) {
                                 if (listElements.item(index)) {
                                     createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
                                 }
@@ -148,7 +148,7 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
                 if (listItems && listElements.length > 0) {
                     listSections.forEach((section) => {
                         section.items.forEach((listItem, index) => {
-                            if (listItem.id === eachBlock.id && lineStart === section.section.position.start.line) {
+                            if (listItem.id === eachLink.id && lineStart === section.section.position.start.line) {
                                 if (listElements.item(index)) {
                                     createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
                                 }
