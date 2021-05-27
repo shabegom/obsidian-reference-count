@@ -52,7 +52,7 @@ export default class BlockRefCounter extends Plugin {
 function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
     const view = leaf ?  leaf.view : app.workspace.activeLeaf.view
     const sourcePath = view.file?.path
-    const sections = view.previewMode.renderer.sections
+    const sections = view.previewMode?.renderer.sections
     if (sourcePath && sections) {
         sections.forEach((section: { lineStart: number; lineEnd: number; el: HTMLElement; }) => {
             const lineStart = section.lineStart
@@ -60,7 +60,7 @@ function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
             const val = section.el
             const getSectionInfo = (val: HTMLElement) => ({val, lineStart, lineEnd, text: ""})
 
-            addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
+            addBlockReferences({app: app, ctx: {getSectionInfo, sourcePath}, val })
         })
 
     }
