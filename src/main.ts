@@ -1,4 +1,4 @@
-import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView} from "obsidian"
+import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView, WorkspaceLeaf} from "obsidian"
 import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
 import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "./indexer"
 
@@ -21,44 +21,17 @@ export default class BlockRefCounter extends Plugin {
             const {blocks, embeds, links} = this.app.metadataCache.getFileCache(file)
             buildIndexObjects({ blocks, embeds, links, file })
             updateIndex()
-            const view = this.app.workspace.activeLeaf.view 
-            const sourcePath = view.file.path
-            const sections = view.previewMode.renderer.sections
-            sections.forEach(section => {
-                const lineStart = section.lineStart
-                const lineEnd = section.lineEnd
-                const val = section.el
-                const getSectionInfo = (val) => ({lineStart, lineEnd, text: ""})
-                addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
-            })
+            createPreviewView({app: this.app})
         })
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
             console.log("layout change")
-            const view = this.app.workspace.activeLeaf.view 
-            const sourcePath = view.file.path
-            const sections = view.previewMode.renderer.sections
-            sections.forEach(section => {
-                const lineStart = section.lineStart
-                const lineEnd = section.lineEnd
-                const val = section.el
-                const getSectionInfo = (val) => ({lineStart, lineEnd, text: ""})
-                addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
-            })
+            createPreviewView({app: this.app})
         })
 
         this.activeLeafChange = this.app.workspace.on("active-leaf-change", (leaf) => {
             console.log("active leaf change")
-            const view = leaf.view
-            const sourcePath = view.file.path
-            const sections = view.previewMode.renderer.sections
-            sections.forEach(section => {
-                const lineStart = section.lineStart
-                const lineEnd = section.lineEnd
-                const val = section.el
-                const getSectionInfo = (val) => ({lineStart, lineEnd, text: ""})
-                addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
-            })
+            createPreviewView({leaf, app: this.app})
         })
 
         this.registerMarkdownPostProcessor((val, ctx) => {
@@ -67,10 +40,6 @@ export default class BlockRefCounter extends Plugin {
   
     }
 
-
-  
-
-
     onunload(): void {
         console.log("unloading plugin: Block Reference Counter")
         this.app.metadataCache.offref(this.cacheUpdate)
@@ -78,6 +47,24 @@ export default class BlockRefCounter extends Plugin {
         this.app.workspace.offref(this.layoutChange)
         this.app.workspace.offref(this.activeLeafChange)
     }
+}
+
+function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
+    const view = leaf ?  leaf.view : app.workspace.activeLeaf.view
+    const sourcePath = view.file?.path
+    const sections = view.previewMode?.renderer.sections
+    if (sourcePath && sections) {
+        sections.forEach((section: { lineStart: number; lineEnd: number; el: HTMLElement; }) => {
+            const lineStart = section.lineStart
+            const lineEnd = section.lineEnd
+            const val = section.el
+            const getSectionInfo = (val: HTMLElement) => ({val, lineStart, lineEnd, text: ""})
+
+            addBlockReferences({app: app, ctx: {getSectionInfo, sourcePath}, val })
+        })
+
+    }
+
 }
 
 function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
@@ -143,7 +130,7 @@ function createButtonElement({app, blockRefs, val }: CreateButtonElement): void 
     })
     existingButton && existingButton.remove()
     if (blockRefs.count > 0) {
-    val.prepend(countEl)
+        val.prepend(countEl)
     }
 
 }

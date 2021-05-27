@@ -1,8 +1,15 @@
-import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache,  } from "obsidian"
+import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache  } from "obsidian"
+
+declare module "obsidian" {
+  interface View {
+    file: TFile
+    previewMode: {renderer: {sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}
+  }
+}
 
 export interface AddBlockReferences {
   app: App
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext | { sourcePath: string, getSectionInfo: (val: HTMLElement) => void }
   val: HTMLElement
 }
 
