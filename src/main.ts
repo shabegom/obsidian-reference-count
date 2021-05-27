@@ -63,15 +63,18 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }, ca
     const sourcePath = view.file?.path
     const mdCache = app.metadataCache.getCache(sourcePath)
     const { listItems, sections } = mdCache || {}
-    const listSections = sections.filter(section => section.type === "list").map(section => {
-        const items: ListItemCache[] = []
-        listItems.forEach(item => {
-            if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
-                items.push(item)
-            }
+    let listSections: any
+    if (sections && listItems) {
+        listSections = sections.filter(section => section.type === "list").map(section => {
+            const items: ListItemCache[] = []
+            listItems.forEach(item => {
+                if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
+                    items.push(item)
+                }
+            })
+            return { section, items }
         })
-        return { section, items }
-    })
+    }
 
     const mdSections = view.previewMode?.renderer.sections
     if (sourcePath && mdSections) {
