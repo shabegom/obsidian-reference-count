@@ -1,6 +1,6 @@
 import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView} from "obsidian"
 import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
-import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex } from "./indexer"
+import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex, getPages } from "./indexer"
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
@@ -56,7 +56,12 @@ export default class BlockRefCounter extends Plugin {
                 const lineStart = section.lineStart
                 const lineEnd = section.lineEnd
                 const val = section.el
-                const getSectionInfo = (val) => ({lineStart, lineEnd, text: ""})
+                const getSectionInfo = (val) => ({ lineStart, lineEnd, text: "" })
+                //console.log(section)
+                //console.log(lineStart)
+                //console.log(lineEnd)
+                //console.log(val)
+                console.log(`Leaf Change: Ln${lineStart}-${lineEnd}`)
                 addBlockReferences({app: this.app, ctx: {getSectionInfo, sourcePath}, val })
             })
         })
@@ -66,10 +71,6 @@ export default class BlockRefCounter extends Plugin {
         })
   
     }
-
-
-  
-
 
     onunload(): void {
         console.log("unloading plugin: Block Reference Counter")
@@ -82,10 +83,41 @@ export default class BlockRefCounter extends Plugin {
 
 function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
     const { lineStart, lineEnd } = ctx.getSectionInfo(val) || {}
-    //console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
+    console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
     const { blocks, listItems, sections } = app.metadataCache.getCache(ctx.sourcePath) || {}
-    if (blocks) {
-        const matchedBlock = Object.values(blocks).find((eachBlock) => { if (eachBlock.position.start.line >= lineStart && eachBlock.position.start.line <= lineEnd) { return true } else { return false } })
+    const pageLinks = getPages();
+    console.log(ctx.sourcePath);
+    console.log(pageLinks);
+    console.log(pageLinks[ctx.sourcePath]);
+    /*
+            pages[file.path]
+            if (foundEmbeds.length > 0 || foundLinks.length > 0) {
+                pages[file.path] = {
+                    embeds: foundEmbeds,
+                    links: foundLinks
+                }
+            }
+        */
+
+    if (pageLinks[ctx.sourcePath]) {
+        let matchedBlock;
+        if (blocks) {
+            matchedBlock = Object.values(blocks).find((eachBlock) => {
+                console.log(eachBlock.position.start.line);
+                console.log(lineStart);
+                console.log(lineEnd);
+                if (eachBlock.position.start.line >= lineStart && eachBlock.position.start.line <= lineEnd) { return true } else { return false }
+            })
+        }
+        if (!matchedBlock && pageLinks[ctx.sourcePath].embeds) {
+            matchedBlock = Object.values(pageLinks[ctx.sourcePath].embeds).find((eachEmbed) => {
+                console.log(eachEmbed);
+                console.log(eachEmbed.pos);
+                console.log(lineStart);
+                console.log(lineEnd);
+                if (eachEmbed.pos >= lineStart && eachEmbed.pos <= lineEnd) { return true } else { return false }
+            })
+        }
         if (matchedBlock) {
             console.log("markdownPostProcessor Block Ref section...")
             const blockRefs = getIndex()
@@ -101,30 +133,67 @@ function addBlockReferences({ app, ctx, val }: AddBlockReferences): void {
             })
             const listElements = val.querySelectorAll("li")
 
-            Object.values(blocks).forEach((block) => {
-                const myId = `${thisFile.basename}^${block.id}`
-                if (blockRefs[myId] && blockRefs[myId]) {
-                    if (sections) {
-                        sections.forEach(section => {
-                            if (section.id === block.id && lineStart === block.position.start.line) {
-                                createButtonElement({ app, blockRefs: blockRefs[myId], val })
-                            }
-
-                        })
-                    }
-                    if (listItems && listElements.length > 0) {
-                        listSections.forEach((section) => {
-                            section.items.forEach((listItem, index) => {
-                                if (listItem.id === block.id && lineStart === section.section.position.start.line) {
-                                    if (listElements.item(index)) {
-                                        createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
-                                    }
+            if (blocks) {
+                Object.values(blocks).forEach((block) => {
+                    const myId = `${thisFile.basename}^${block.id}`
+                    if (blockRefs[myId] && blockRefs[myId]) {
+                        if (sections) {
+                            sections.forEach(section => {
+                                if (section.id === block.id && lineStart === block.position.start.line) {
+                                    createButtonElement({ app, blockRefs: blockRefs[myId], val })
                                 }
+
                             })
-                        })
+                        }
+                        if (listItems && listElements.length > 0) {
+                            listSections.forEach((section) => {
+                                section.items.forEach((listItem, index) => {
+                                    if (listItem.id === block.id && lineStart === section.section.position.start.line) {
+                                        if (listElements.item(index)) {
+                                            createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
+                                        }
+                                    }
+                                })
+                            })
+                        }
                     }
-                }
-            })
+                })
+            }
+
+            if (pageLinks[ctx.sourcePath].embeds) {
+                console.log('embeds here');
+                Object.values(pageLinks[ctx.sourcePath].embeds).forEach((embed) => {
+                    console.log(embed);
+                    const myId = `${embed.page}^${embed.id}`
+                    console.log(myId);
+                    if (blockRefs[myId] && embed.pos >= lineStart && embed.pos <= lineEnd) {
+                        console.log('Create button now!');
+                        createButtonElement({ app, blockRefs: blockRefs[myId], val })
+                        /*
+                        if (sections) {
+                            sections.forEach(section => {
+                                if (lineStart === embed.pos) {
+                                    createButtonElement({ app, blockRefs: blockRefs[myId], val })
+                                }
+
+                            })
+                        }
+                        
+                        if (listItems && listElements.length > 0) {
+                            listSections.forEach((section) => {
+                                section.items.forEach((listItem, index) => {
+                                    if (listItem.id === embed.id && lineStart === section.section.position.start.line) {
+                                        if (listElements.item(index)) {
+                                            createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
+                                        }
+                                    }
+                                })
+                            })
+                        }
+                        */
+                    }
+                })
+            }
         }
     }
 }
