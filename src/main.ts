@@ -26,12 +26,21 @@ export default class BlockRefCounter extends Plugin {
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
             console.log("layout change")
-            createPreviewView({app: this.app})
+            const thisApp = this.app
+            if (thisApp) {
+                if (thisApp.workspace.activeLeaf.view.previewMode) {
+                    thisApp.workspace.activeLeaf.view.previewMode.renderer.onRendered(function () {
+                        //For whatever reason, needed to reset this here otherwise it was re-rendering itself again and running the createPreviewView() twice
+                        thisApp.workspace.activeLeaf.view.previewMode.renderer.onRendered(function () { })
+                        createPreviewView({ app: thisApp }, 'layout')
+                    })
+                }
+            }
         })
 
         this.activeLeafChange = this.app.workspace.on("active-leaf-change", (leaf) => {
             console.log("active leaf change")
-            createPreviewView({leaf, app: this.app})
+            createPreviewView({ leaf, app: this.app }, 'leaf')
         })
 
         this.registerMarkdownPostProcessor((val, ctx) => {
@@ -48,7 +57,8 @@ export default class BlockRefCounter extends Plugin {
     }
 }
 
-function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
+function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }, callSource: string) {
+    console.log('createPreviewView() from: ' + callSource)
     const view = leaf ?  leaf.view : app.workspace.activeLeaf.view
     const sourcePath = view.file?.path
     const mdCache = app.metadataCache.getCache(sourcePath)
