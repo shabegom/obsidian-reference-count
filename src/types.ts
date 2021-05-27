@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache  } from "obsidian"
+import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache, MetadataCache, CachedMetadata, WorkspaceLeaf, View } from "obsidian"
 
 declare module "obsidian" {
   interface View {
@@ -11,6 +11,9 @@ export interface AddBlockReferences {
   app: App
   ctx: MarkdownPostProcessorContext | { sourcePath: string, getSectionInfo: (val: HTMLElement) => void }
   val: HTMLElement
+  mdCache: CachedMetadata
+  listSections: any
+  actView: View
 }
 
 export interface CreateButtonElement {

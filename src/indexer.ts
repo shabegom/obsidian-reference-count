@@ -8,6 +8,10 @@ export function getIndex(): Index {
     return Object.assign({}, index)
 }
 
+export function getPages(): Pages {
+    return Object.assign({}, pages)
+}
+
 export function updateIndex(): void {
     //console.log('updateIndex()')
     Object.keys(index).forEach(key => {
