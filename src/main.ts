@@ -1,4 +1,4 @@
-import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView, WorkspaceLeaf, BlockCache, EmbedCache, LinkCache } from "obsidian"
+import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView, WorkspaceLeaf, BlockCache, EmbedCache, LinkCache, HeadingCache } from "obsidian"
 import { AddBlockReferences, CreateButtonElement, EmbedOrLinkItem, FileRef, } from "./types"
 import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex, getPages } from "./indexer"
 
@@ -78,10 +78,11 @@ function createPreviewView({leaf, app}: {leaf?: WorkspaceLeaf, app: App}) {
 function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: AddBlockReferences): void {
     const { lineStart, lineEnd } = ctx.getSectionInfo(val) || {}
     //console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
-    const { blocks, listItems } = mdCache || {}
+    const { blocks, listItems, headings } = mdCache || {}
     const pageLinks = getPages();
     const foundPage = pageLinks[ctx.sourcePath];
     let matchedBlock: BlockCache[] = []
+    let matchedHeading: HeadingCache[] = []
     let matchedEmbed: EmbedOrLinkItem[] = []
     let matchedLink: EmbedOrLinkItem[] = []
 
@@ -90,9 +91,18 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
             if (eachBlock.position.start.line >= lineStart && eachBlock.position.end.line <= lineEnd) { return true } else { return false }
         })
     }
-    if (foundPage && matchedBlock.length === 0) {
-        if (foundPage.embeds) { matchedEmbed = Object.values(foundPage.embeds).filter((eachEmbed) => { if (eachEmbed.pos >= lineStart && eachEmbed.pos <= lineEnd) { return true } else { return false } }) }
-        if (matchedEmbed.length === 0 && foundPage.links) { matchedLink = Object.values(foundPage.links).filter((eachLink) => { if (eachLink.pos >= lineStart && eachLink.pos <= lineEnd) { return true } else { return false } }) }
+    if (headings && matchedBlock.length === 0) {
+        matchedHeading = Object.values(headings).filter((eachHead) => {
+            if (eachHead.position.start.line >= lineStart && eachHead.position.end.line <= lineEnd) { return true } else { return false }
+        })
+    }
+    if (foundPage && matchedBlock.length === 0 && matchedHeading.length === 0) {
+        if (foundPage.embeds) {
+            matchedEmbed = Object.values(foundPage.embeds).filter((eachEmbed) => { if (eachEmbed.pos >= lineStart && eachEmbed.pos <= lineEnd) { return true } else { return false } })
+        }
+        if (matchedEmbed.length === 0 && foundPage.links) {
+            matchedLink = Object.values(foundPage.links).filter((eachLink) => { if (eachLink.pos >= lineStart && eachLink.pos <= lineEnd) { return true } else { return false } })
+        }
     }
     if (matchedBlock.length > 0) {
         console.log("addBlockReferences: matchedBlock: Ln-" + lineStart)
@@ -116,12 +126,26 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
                 }
             }
         })
+    } else if (matchedHeading.length > 0) {
+        console.log("addBlockReferences: matchedHeading: Ln-" + lineStart)
+        const headerRefs = getIndex()
+        Object.values(matchedHeading).forEach(eachHead => {
+            const myId = `${actView.file.basename}#${eachHead.heading}`
+            if (headerRefs[myId] && headerRefs[myId].count >= 0) {
+                createButtonElement({ app, blockRefs: headerRefs[myId], val })
+            }
+        })
     } else if (matchedEmbed.length > 0) {
         console.log("addBlockReferences: matchedEmbed: Ln-" + lineStart)
         const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedEmbed).forEach(eachEmbed => {
-            const myId = `${eachEmbed.page}^${eachEmbed.id}`
+            let myId: string
+            if (eachEmbed.type === 'block') {
+                myId = `${eachEmbed.page}^${eachEmbed.id}`
+            } else {
+                myId = `${eachEmbed.page}#${eachEmbed.id}`
+            }
             if (blockRefs[myId] && blockRefs[myId].count > 0) {
                 if (listItems && listElements.length > 0) {
                     listSections.forEach((section) => {
@@ -143,7 +167,12 @@ function addBlockReferences({ app, ctx, val, mdCache, listSections, actView }: A
         const blockRefs = getIndex()
         const listElements = val.querySelectorAll("li")
         Object.values(matchedLink).forEach(eachLink => {
-            const myId = `${eachLink.page}^${eachLink.id}`
+            let myId: string
+            if (eachLink.type === 'block') {
+                myId = `${eachLink.page}^${eachLink.id}`
+            } else {
+                myId = `${eachLink.page}#${eachLink.id}`
+            }
             if (blockRefs[myId] && blockRefs[myId].count > 0) {
                 if (listItems && listElements.length > 0) {
                     listSections.forEach((section) => {

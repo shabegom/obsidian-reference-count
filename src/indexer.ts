@@ -1,4 +1,5 @@
 import {App} from "obsidian"
+import { type } from "os"
 import {Index, Pages, EmbedOrLinkItem, BuildIndexObjects} from "./types"
 
 const index: Index = {}
@@ -20,14 +21,24 @@ export function updateIndex(): void {
     })
     Object.values(pages).forEach(eachPage => {
         eachPage.embeds.forEach(embed => {
-            const id = `${embed.page}^${embed.id}`
+            let id
+            if (embed.type === 'block') {
+                id = `${embed.page}^${embed.id}`
+            } else {
+                id = `${embed.page}#${embed.id}`
+            }
             if (index[id]) {
                 index[id].count++
                 index[id].references.add({ file: embed.file, line: embed.pos })
             }
         })
         eachPage.links.forEach(link => {
-            const id = `${link.page}^${link.id}`
+            let id
+            if (link.type === 'block') {
+                id = `${link.page}^${link.id}`
+            } else {
+                id = `${link.page}#${link.id}`
+            }
             if (index[id]) {
                 index[id].count++
                 index[id].references.add({ file: link.file, line: link.pos })
@@ -59,14 +70,15 @@ export function buildIndexObjects({blocks, embeds, links, file}: BuildIndexObjec
                 count: 0,
                 id: newid,
                 file: file,
-                references: new Set()
+                references: new Set(),
+                type: 'block'
             }
         })
     }
     const foundEmbeds: EmbedOrLinkItem[] = []
     if (embeds) {
         embeds.forEach(embed => {
-            const split = embed.link.split("^")
+            let split = embed.link.split("^")
             const id = split[1]
             if (id) {
                 const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
@@ -75,9 +87,33 @@ export function buildIndexObjects({blocks, embeds, links, file}: BuildIndexObjec
                         id,
                         file,
                         pos: embed.position.start.line,
-                        page
+                        page,
+                        type: 'block'
                     }
                 )
+            } else {
+                split = embed.link.split("#")
+                const header: string = split[1]
+                if (header) {
+                    const page = (split[0] ? split[0] : file.basename)
+                    foundEmbeds.push(
+                        {
+                            id: header,
+                            file,
+                            pos: embed.position.start.line,
+                            page,
+                            type: 'header'
+                        }
+                    )
+                    const newid = embed.link
+                    index[newid] = {
+                        count: 0,
+                        id: newid,
+                        file: file,
+                        references: new Set(),
+                        type: 'header'
+                    }
+                }
             }
         })
     }
@@ -85,18 +121,42 @@ export function buildIndexObjects({blocks, embeds, links, file}: BuildIndexObjec
     const foundLinks: EmbedOrLinkItem[] = []
     if (links) {
         links.forEach(link => {
-            const split = link.link.split("^")
+            let split = link.link.split("^")
             const id = split[1]
             if (id) {
                 const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
-                foundLinks.push(
+                foundEmbeds.push(
                     {
                         id,
                         file,
                         pos: link.position.start.line,
-                        page
+                        page,
+                        type: 'block'
                     }
                 )
+            } else {
+                split = link.link.split("#")
+                const header: string = split[1]
+                if (header) {
+                    const page = (split[0] ? split[0] : file.basename)
+                    foundEmbeds.push(
+                        {
+                            id: header,
+                            file,
+                            pos: link.position.start.line,
+                            page,
+                            type: 'header'
+                        }
+                    )
+                    const newid = link.link
+                    index[newid] = {
+                        count: 0,
+                        id: newid,
+                        file: file,
+                        references: new Set(),
+                        type: 'header'
+                    }
+                }
             }
         })
     }

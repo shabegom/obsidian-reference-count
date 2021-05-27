@@ -37,6 +37,7 @@ interface IndexItem {
   id: string
   file: TFile
   references: Set<IndexItemReference>
+  type: string
 }
 
 export interface Index {
@@ -48,6 +49,7 @@ export interface EmbedOrLinkItem {
   file: TFile
   pos: number
   page: string
+  type: string
 }
 
 
