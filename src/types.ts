@@ -1,4 +1,4 @@
-import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache  } from "obsidian"
+import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache, MetadataCache, CachedMetadata, WorkspaceLeaf, View } from "obsidian"
 
 declare module "obsidian" {
   interface View {
@@ -11,6 +11,10 @@ export interface AddBlockReferences {
   app: App
   ctx: MarkdownPostProcessorContext | { sourcePath: string, getSectionInfo: (val: HTMLElement) => void }
   val: HTMLElement
+  mdCache: CachedMetadata
+  listSections: any
+  actView: View
+  blockRefs: Index
 }
 
 export interface CreateButtonElement {
@@ -34,6 +38,7 @@ interface IndexItem {
   id: string
   file: TFile
   references: Set<IndexItemReference>
+  type: string
 }
 
 export interface Index {
@@ -45,6 +50,7 @@ export interface EmbedOrLinkItem {
   file: TFile
   pos: number
   page: string
+  type: string
 }
 
 
