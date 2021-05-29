@@ -25,15 +25,15 @@ export default class BlockRefCounter extends Plugin {
             addPageToArray({app: this.app, file})
         })
 
-         this.deleteFile = this.app.vault.on("delete", (file) => {
+        this.deleteFile = this.app.vault.on("delete", (file) => {
             removePageFromArray({file})
         })
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
             console.log("layout change")
-                    this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(() => {
-                        createPreviewView({ app: this.app })
-                    })
+            this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(() => {
+                createPreviewView({ app: this.app })
+            })
 
         })
 
@@ -69,23 +69,22 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
     })
     elements && elements.forEach((section, index) => {
         addBlockReferences({app, val: section.el, blocks: page.blocks, section: page.sections[index]})
-        if (page.sections[index].type === 'heading') {
+        if (page.sections[index].type === "heading") {
             addHeaderReferences({app, val: section.el, headings: page.headings})
         }
     })
 }
 
-
 function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): void {
-    if (blocks) {
-        blocks.forEach(block => {
-            section.type === 'paragraph' && createButtonElement({app, block, val})
-            section.type === 'list' && section.items.forEach(((item, index) => {
-                const buttons = val.querySelectorAll('li')
-                item.id === block.key && createButtonElement({app, block, val: buttons[index]})
-            })
+
+    blocks && blocks.forEach(block => {
+        section.type === "paragraph" && createButtonElement({app, block, val})
+        section.type === "list" && section.items.forEach((item, index) => {
+            const buttons = val.querySelectorAll("li")
+            item.id === block.key && createButtonElement({app, block, val: buttons[index]})
         })
-    }
+    })
+    
 }
 
 function addHeaderReferences({app, val, headings}) {
@@ -102,13 +101,13 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
     countEl.innerText = block.count.toString()
     const refTable: HTMLElement = createTable({app, val, files: Array.from(block.references)})
     countEl.on("click", "button", () => {
-        if (!val.children.namedItem('ref-table')) {
-            block.type === 'block' && val.insertBefore(refTable, val.lastChild)
-            block.type === 'header' && val.appendChild(refTable)
+        if (!val.children.namedItem("ref-table")) {
+            block.type === "block" && val.insertBefore(refTable, val.lastChild)
+            block.type === "header" && val.appendChild(refTable)
         } else {
-        if (val.children.namedItem('ref-table')) {
-            val.removeChild(refTable)
-        }
+            if (val.children.namedItem("ref-table")) {
+                val.removeChild(refTable)
+            }
         }
 
 
@@ -119,7 +118,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 
 function createTable({app, val, files}: {app: App, val: HTMLElement, files: FileRef[]}) {
     const refTable = createEl("table", {cls: "ref-table"})
-    refTable.setAttribute('id', 'ref-table')
+    refTable.setAttribute("id", "ref-table")
     const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
     const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
     const removeTable = createEl("button", {text: "❌" })

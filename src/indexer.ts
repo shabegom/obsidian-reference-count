@@ -16,9 +16,7 @@ export function indexBlockReferences({ app }: { app: App }): void {
         const { links, embeds, headings, blocks, sections, listItems} = app.metadataCache.getFileCache(file) || {}
         buildPagesArray({embeds, links, headings, blocks, file, sections, listItems})
     })
-
     buildObjects({pages, currentPage: 0, allLinks: []})
-    console.log(pages)
 }
 
 function buildPagesArray({embeds, links, file, headings, blocks, sections, listItems}) {
@@ -83,34 +81,30 @@ function createListSections({sections, listItems}) {
     return sections
 }
 
-function buildObjects({pages, currentPage, allLinks}) {
-    const numPages = pages.length
-    if (currentPage > numPages) {
-        pages.forEach(page => {
-            allLinks.forEach(link => {
-                page.blocks && page.blocks.forEach(block => {
-                    if (link.type === 'block' && link.id === block.key) {
-                        block.count = Array.from(block.references).length
-                        block.references.add(link)
-                    }
-                })
-                page.headings && page.headings.forEach((heading) => {
-                    if (link.type === 'heading' && link.id === heading.key) {
-                        heading.count = Array.from(heading.references).length
-                        heading.references.add(link)
-                    } 
-                })
+function buildObjects({pages}) {
+    const allLinks = pages.reduce((acc, page) => {
+        acc.push(...page.links)
+        return acc
+    }, [])
+    pages.forEach(page => {
+        allLinks.forEach(link => {
+            page.blocks && page.blocks.forEach(block => {
+                if (link.type === "block" && link.id === block.key) {
+                    block.count = Array.from(block.references).length
+                    block.references.add(link)
+                }
+               
             })
+            page.headings && page.headings.forEach((heading) => {
+                if (link.type === "heading" && link.id === heading.key) {
+                    heading.count = Array.from(heading.references).length
+                    heading.references.add(link)
+                }
+            })
+
         })
-        return
-    }
-    pages.forEach((page) => {
-        if (page.links) {
-            allLinks.push(...page.links)
-        }
+        
     })
-    currentPage++
-    buildObjects({pages, currentPage, allLinks})
 }
 
 
@@ -136,8 +130,8 @@ function findItems(items, file) {
                     }
                 )
             } 
-            if (header) {
-                const page = (note ? note : basename)
+            if (header && header[1] && !header[1].startsWith("^")) {
+                
                 foundItems.push(
                     {
                         id: header[1],
