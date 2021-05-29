@@ -47,8 +47,8 @@ export interface Index {
 
 export interface EmbedOrLinkItem {
   id: string
-  file: TFile
   pos: number
+  file: TFile
   page: string
   type: string
 }
@@ -56,8 +56,8 @@ export interface EmbedOrLinkItem {
 
 
 interface PageItem {
-  embeds: EmbedOrLinkItem[]
-  links: EmbedOrLinkItem[]
+  items: EmbedOrLinkItem[]
+  file: TFile
 }
 
 export interface Pages {
