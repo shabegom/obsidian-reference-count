@@ -1,9 +1,9 @@
-import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache, MetadataCache, CachedMetadata, WorkspaceLeaf, View } from "obsidian"
+import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache, MetadataCache, CachedMetadata, WorkspaceLeaf, SectionCache, View, ListItemCache, HeadingCache } from "obsidian"
 
 declare module "obsidian" {
   interface View {
     file: TFile
-    previewMode: {renderer: {sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}
+    previewMode: {renderer: {onRendered: () => void, sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}
   }
 }
 
@@ -19,9 +19,10 @@ export interface AddBlockReferences {
 
 export interface CreateButtonElement {
   app: App
-  blockRefs: IndexItem
+  block: BlockObject
   val: HTMLElement
 }
+
 
 export interface FileRef {
   file: TFile
@@ -53,20 +54,52 @@ export interface EmbedOrLinkItem {
   type: string
 }
 
-
-
-interface PageItem {
-  items: EmbedOrLinkItem[]
-  file: TFile
+interface Heading {
+          key: string
+        pos: number
+        references: Set<any>
+        page: string
+        type: string
 }
 
-export interface Pages {
-  [id: string]: PageItem
+interface Block {
+         key: string
+        pos: number
+        id: string
+        references: Set<any>
+        page: string
+        type: string
+}
+
+interface ListItem extends ListItemCache {
+  pos: number
+}
+
+interface Section extends SectionCache {
+  items: ListItem[]
+}
+
+export interface Page {
+     items: EmbedOrLinkItem[]
+     headings: Heading[]
+     blocks: Block[]
+     file: TFile
+     sections: Section[]
 }
 
 export interface BuildIndexObjects {
   blocks: Record<string, BlockCache>
   links: LinkCache[]
   embeds: EmbedCache[]
+  file: TFile
+}
+
+export interface BuildPagesArray {
+  embeds: EmbedCache[]
+  links: LinkCache[]
+  headings: HeadingCache[]
+  blocks: Record<string, BlockCache>
+  sections: SectionCache[]
+  listItems: ListItemCache[]
   file: TFile
 }

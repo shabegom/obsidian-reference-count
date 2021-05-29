@@ -1,66 +1,59 @@
 import {App} from "obsidian"
-import {Pages, EmbedOrLinkItem, BuildIndexObjects} from "./types"
+import {Page, EmbedOrLinkItem, BuildPagesArray} from "./types"
 
-let pages = []
+let pages: Page[] = []
 
-export function getPages(): Pages {
+export function getPages(): Page[] {
     return [...pages]
 }
-
-
 
 export function indexBlockReferences({ app }: { app: App }): void {
     pages = []
     const files = app.vault.getMarkdownFiles()
-    files.forEach(file => {
-        const { links, embeds, headings, blocks, sections, listItems} = app.metadataCache.getFileCache(file) || {}
-        buildPagesArray({embeds, links, headings, blocks, file, sections, listItems})
-    })
-    buildObjects({pages, currentPage: 0, allLinks: []})
+    let i = 0
+    while (i < files.length) {
+        const { links, embeds, headings, blocks, sections, listItems} = app.metadataCache.getFileCache(files[i])
+        buildPagesArray({embeds, links, headings, blocks, sections, listItems, file: files[i]})
+        i++
+    }
+    buildObjects({pages})
+    buildLinksAndEmbeds({pages})
 }
 
-function buildPagesArray({embeds, links, file, headings, blocks, sections, listItems}) {
+function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray) {
     embeds = embeds ? embeds : []
     links = links ? links : []
     blocks = blocks && Object.entries(blocks).map(([key, block]) => ({
-        count: 0,
         key,
         pos: block.position.start.line,
         id: block.id,
         references: new Set(),
+        page: file.basename,
         type: "block"
     }))
     headings = headings && headings.map(header => ({
-        count: 0,
         key: header.heading,
         pos: header.position.start.line,
         references: new Set(),
+        page: file.basename,
         type: "header"
     }))
     const foundItems = findItems([...embeds, ...links], file)
     const listSections = createListSections({sections, listItems})
     if (foundItems) {
         pages.push({
-            file,
-            links: foundItems,
+            items: foundItems,
             headings,
             blocks,
+            file,
             sections: listSections
         })
     }
     
 }
 
-export function removePageFromArray({file}) {
-    pages = pages.filter(page => page.file.basename !== file.basename)
-}
 
-export function addPageToArray({app, file}) {
-    const { links, embeds, headings, blocks, sections, listItems} = app.metadataCache.getFileCache(file) || {}
-    removePageFromArray({file})
-    buildPagesArray({embeds, links, headings, blocks, file, sections, listItems})
-    buildObjects({pages, currentPage: 0, allLinks: []})
-}
+
 
 function createListSections({sections, listItems}) {
     if (listItems) {
@@ -69,7 +62,7 @@ function createListSections({sections, listItems}) {
             if (section.type === "list") {
                 listItems.forEach((item)=> {
                     if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
-                        items.push(item)
+                        items.push({pos: item.position.start.line, ...item})
                     }
                 })
                 section.items = items
@@ -83,42 +76,52 @@ function createListSections({sections, listItems}) {
 
 function buildObjects({pages}) {
     const allLinks = pages.reduce((acc, page) => {
-        acc.push(...page.links)
+        acc.push(...page.items)
         return acc
     }, [])
+    
     pages.forEach(page => {
         allLinks.forEach(link => {
             page.blocks && page.blocks.forEach(block => {
-                if (link.type === "block" && link.id === block.key) {
-                    block.count = Array.from(block.references).length
+                if (link.type === "block" && link.id === block.key && link.page === block.page) {
                     block.references.add(link)
                 }
                
             })
             page.headings && page.headings.forEach((heading) => {
-                if (link.type === "heading" && link.id === heading.key) {
-                    heading.count = Array.from(heading.references).length
+                if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
                     heading.references.add(link)
                 }
             })
+        })  
+    })
+ 
+}
 
+function buildLinksAndEmbeds({pages}) {
+    const allRefs = pages.reduce((acc, page) => {
+        page.blocks && acc.push(...page.blocks)
+        page.headings && acc.push(...page.headings)
+        return acc
+    }, [])
+    pages.forEach(page => {
+        page.items && page.items.forEach(item => {
+            const ref = allRefs.find(ref => ref.key === item.id && ref.page === item.page)
+            item.reference = {...ref, type: "link"}
         })
-        
     })
 }
 
 
-
-
 function findItems(items, file) {
     const foundItems: EmbedOrLinkItem[] = []
-    const basename = file.basename
     if (items) {
         items.forEach(item => {
             const [note, id] = item.link.split("^")
             const pos = item.position.start.line
-            const page = (note.split("#")[0] ? note.split("#")[0] : basename)
+            const page = note.split("#")[0] ? note.split("#")[0] : file.basename
             const header = item.link.match(/.*#(.*)/)
+            const embed = item.original.match(/^!/) ? true : false
             if (id) {
                 foundItems.push(
                     {
@@ -126,19 +129,22 @@ function findItems(items, file) {
                         pos,
                         page,
                         file,
-                        type: "block"
+                        type: "block",
+                        embed,
+                        reference: {}
                     }
                 )
             } 
             if (header && header[1] && !header[1].startsWith("^")) {
-                
                 foundItems.push(
                     {
                         id: header[1],
                         pos,
                         page,
                         file,
-                        type: "heading"
+                        type: "heading",
+                        embed,
+                        reference: {}
                     }
                 )
             }
