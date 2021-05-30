@@ -1,3 +1,4 @@
+
 import { App, EventRef, Plugin,   WorkspaceLeaf, TFile  } from "obsidian"
 import { AddBlockReferences, CreateButtonElement, AddHeaderReferences, Heading, AddLinkReferences, Reference, EmbedOrLinkItem } from "./types"
 import { indexBlockReferences, getPages } from "./indexer"
@@ -36,6 +37,7 @@ export default class BlockRefCounter extends Plugin {
             indexBlockReferences({app: this.app})
             createPreviewView({ app: this.app })
         }
+
         
 
         
@@ -58,6 +60,7 @@ export default class BlockRefCounter extends Plugin {
             this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(() => {
                 createPreviewView({ app: this.app })
             })
+
         })
 
         this.activeLeafChange = this.app.workspace.on("active-leaf-change", (leaf) => {
@@ -75,6 +78,7 @@ export default class BlockRefCounter extends Plugin {
         this.app.workspace.offref(this.deleteFile)
     }
 }
+
 
 
 /**
@@ -97,6 +101,7 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
         }
         return acc
     })
+
     if (page) {
         elements && elements.forEach((section, index) => {
             const pageSection = page.sections[index]
@@ -120,8 +125,11 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
             }
         
         })
-    }
+    })
+    
+    
 }
+
 
 /**
  * Iterate through the blocks in the note and add a block ref button if the section includes a block-id
@@ -171,6 +179,7 @@ function addLinkReferences({app, val, links, section, embedLink}: AddLinkReferen
                 link.reference && embedLink && createButtonElement({app, block: link.reference, val: embedLink})
                 if (link.reference && !embedLink && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
+
                     link.reference.type = "block"
                     createButtonElement({app, block: link.reference, val: buttons[index]})
                 }
@@ -190,6 +199,7 @@ function addLinkReferences({app, val, links, section, embedLink}: AddLinkReferen
  *
  * @return  {void}                       
  */
+
 function addHeaderReferences({app, val, headings, section}: AddHeaderReferences) {
     if (headings) {
         headings.forEach((header: Heading) => {
@@ -197,6 +207,7 @@ function addHeaderReferences({app, val, headings, section}: AddHeaderReferences)
         })
     }
 }
+
 
 /**
  * Add a button with the number of references to the Preview of a note
@@ -209,15 +220,18 @@ function addHeaderReferences({app, val, headings, section}: AddHeaderReferences)
  */
 function createButtonElement({ app, block, val }: CreateButtonElement): void {
     const count = block && block.references ? block.references.size : 0
+
     const existingButton = val.querySelector("#count")
     const countEl = createEl("button", { cls: "count" })
     countEl.setAttribute("id", "count")
     countEl.innerText = count.toString()
+
     const refTable: HTMLElement = createTable({app, val, files: block.references})
 
     countEl.on("click", "button", () => {
         if (!val.children.namedItem("ref-table")) {
             // depending on the type of block the table needs to be inserted into the DOM at different points
+
             block.type === "block"  && val.insertBefore(refTable, val.lastChild)
             block.type === "header" && val.appendChild(refTable)
             block.type === "link" && val.append(refTable)
@@ -245,7 +259,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 function createTable({app, val, files}: {app: App, val: HTMLElement | Element, files: Reference[] | Set<unknown> | void}) {
     const refTable = createEl("table", {cls: "ref-table"})
     refTable.setAttribute("id", "ref-table")
-    
+
     const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
     const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
     const removeTable = createEl("button", {text: "❌" })
@@ -256,9 +270,11 @@ function createTable({app, val, files}: {app: App, val: HTMLElement | Element, f
     refTable.appendChild(lineHeaderRow)
     refTable.appendChild(removeTable)
 
+
     files && files.forEach(async ( file: Reference ) => {
         const tFile = app.vault.getAbstractFileByPath(file.path) as TFile
         const lineContent = await app.vault.cachedRead(tFile).then(content => content.split("\n")[file.pos])
+
         const row = createEl("tr")
         const noteCell = createEl("td")
         const lineCell = createEl("td")

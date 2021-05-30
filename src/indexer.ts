@@ -1,3 +1,4 @@
+
 import {App, BlockCache, EmbedCache, HeadingCache, LinkCache, ListItemCache, SectionCache} from "obsidian"
 import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems, Reference} from "./types"
 
@@ -9,9 +10,11 @@ let pages: Page[] = []
  *
  * @return  {Page[]}  an aray of Page objects
  */
+
 export function getPages(): Page[] {
     return [...pages]
 }
+
 
 /**
  * Iterate markdown files in the value and builds the pages index with references using metadataCache. 
@@ -21,6 +24,7 @@ export function getPages(): Page[] {
  *
  * @return  {void}
  */
+
 export function indexBlockReferences({ app }: { app: App }): void {
     pages = []
     const files = app.vault.getMarkdownFiles()
@@ -33,6 +37,7 @@ export function indexBlockReferences({ app }: { app: App }): void {
     buildObjects({pages})
     buildLinksAndEmbeds({pages})
 }
+
 
 /**
  * takes in metadataCache items and associated file and pushes the initial page object into the pages array
@@ -51,10 +56,12 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     embeds = embeds ? [...embeds] : []
     links = links ? [...links] : []
 
+
     const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
         key,
         pos: block.position.start.line,
         id: block.id,
+
         page: file.basename,
         type: "block"
     }))
@@ -62,6 +69,7 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     const headingsArray = headings && headings.map(header => ({
         key: header.heading,
         pos: header.position.start.line,
+
         page: file.basename,
         type: "header"
     }))
@@ -80,6 +88,7 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     
 }
 
+
 /**
  * If the section is of type list, add the list items from the metadataCache to the section object. 
  * This makes it easier to iterate a list when building block ref buttons
@@ -89,6 +98,7 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
  *
  * @return  {Section[]}                        Array of sections with additional items key
  */
+
 function createListSections({sections, listItems}: CreateListSections): Section[] {
     if (listItems) {
         return sections.map(section => {
@@ -108,6 +118,7 @@ function createListSections({sections, listItems}: CreateListSections): Section[
     return sections
 }
 
+
 /**
  * Go through every link reference and embed in the vault
  * Add a reference to the link or embed on the associated block avoiding duplicates
@@ -117,6 +128,7 @@ function createListSections({sections, listItems}: CreateListSections): Section[
  *
  * @return  {void}             
  */
+
 function buildObjects({pages}:{pages: Page[]}) {
     const allLinks = pages.reduce((acc, page) => {
         acc.push(...page.items)
@@ -127,21 +139,25 @@ function buildObjects({pages}:{pages: Page[]}) {
         allLinks.forEach(link => {
             page.blocks && page.blocks.forEach(block => {
                 if (link.type === "block" && link.id === block.key && link.page === block.page) {
+
                     const object = {basename: link.file.basename, path:link.file.path, pos: link.pos}
                     if (!isEquivalent(block.references, object)) {
                         block.references = block.references ? block.references : new Set()
                         block.references.add(object)
                     }
+
                 }
                
             })
             page.headings && page.headings.forEach((heading) => {
                 if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
+
                     const object = {basename: link.file.basename, path:link.file.path, pos: link.pos}
                     if (!isEquivalent(heading.references, object)) {
                         heading.references = heading.references ? heading.references : new Set()
                         heading.references.add(object)
                     }
+
 
                 }
             })
@@ -149,6 +165,7 @@ function buildObjects({pages}:{pages: Page[]}) {
     })
  
 }
+
 
 /**
  * Go through every block and heading in the vault
@@ -158,6 +175,7 @@ function buildObjects({pages}:{pages: Page[]}) {
  *
  * @return  {void}             
  */
+
 function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
     const allRefs = pages.reduce((acc, page) => {
         page.blocks && acc.push(...page.blocks)
@@ -168,9 +186,11 @@ function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => ref.key === item.id && ref.page === item.page)
             item.reference = ref && {...ref, type: "link"}
+
         })
     })
 }
+
 
 /**
  * Creates an array of block-id links and embeds that exist in the vault
@@ -180,6 +200,7 @@ function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
  *
  * @return  {[type]}            [return description]
  */
+
 function findItems({items, file}: FindItems) {
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
@@ -210,12 +231,14 @@ function findItems({items, file}: FindItems) {
                         file,
                         type: "heading",
                         embed,
+
                     }
                 )
             }
         })
     }
     return foundItems
+
 }
 
 /**
@@ -236,3 +259,4 @@ function isEquivalent(set: Set<Reference>, object: Reference) {
     })
     return equiv
 }
+

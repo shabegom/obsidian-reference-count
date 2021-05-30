@@ -16,6 +16,7 @@ export interface AddBlockReferences {
 
 export interface CreateButtonElement {
   app: App
+
   block: Block | Heading
   val: HTMLElement | Element
 }
@@ -52,6 +53,7 @@ export interface EmbedOrLinkItem {
   type: string
   embed: boolean
   reference?: Block | Heading
+
 }
 
 export interface Heading {
@@ -66,6 +68,7 @@ export interface Block {
          key: string
         pos: number
         id: string
+
         references?: Set<Reference>
         page: string
         type: string
@@ -82,6 +85,7 @@ export interface Section {
   pos?: number
   type: string
 }
+
 
 export interface Page {
      items: EmbedOrLinkItem[]
