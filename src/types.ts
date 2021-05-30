@@ -16,8 +16,8 @@ export interface AddBlockReferences {
 
 export interface CreateButtonElement {
   app: App
-  block: Block | Heading | Record<string, void>
-  val: HTMLElement
+  block: Block | Heading
+  val: HTMLElement | Element
 }
 
 
@@ -51,13 +51,13 @@ export interface EmbedOrLinkItem {
   page: string
   type: string
   embed: boolean
-  reference?: Block | Record<string, void>
+  reference?: Block | Heading
 }
 
 export interface Heading {
           key: string
         pos: number
-        references: Set<Record<string, EmbedOrLinkItem>> | Set<unknown>
+        references?: Set<Reference>
         page: string
         type: string
 }
@@ -66,7 +66,7 @@ export interface Block {
          key: string
         pos: number
         id: string
-        references: Set<Record<string, EmbedOrLinkItem>> | Set<unknown>
+        references?: Set<Reference>
         page: string
         type: string
 }
@@ -130,4 +130,11 @@ export interface AddLinkReferences {
   val: HTMLElement
   links: EmbedOrLinkItem[]
   section: Section
+  embedLink: Element
+}
+
+export interface Reference {
+  basename: string
+  path: string
+  pos: number
 }

@@ -1,5 +1,5 @@
 import {App} from "obsidian"
-import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems} from "./types"
+import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems, Reference} from "./types"
 
 let pages: Page[] = []
 
@@ -20,21 +20,20 @@ export function indexBlockReferences({ app }: { app: App }): void {
     buildLinksAndEmbeds({pages})
 }
 
+
 function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray) {
-    embeds = embeds ? embeds : []
-    links = links ? links : []
+    embeds = embeds ? [...embeds] : []
+    links = links ? [...links] : []
     const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
         key,
         pos: block.position.start.line,
         id: block.id,
-        references: new Set(),
         page: file.basename,
         type: "block"
     }))
     const headingsArray = headings && headings.map(header => ({
         key: header.heading,
         pos: header.position.start.line,
-        references: new Set(),
         page: file.basename,
         type: "header"
     }))
@@ -51,9 +50,6 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     }
     
 }
-
-
-
 
 function createListSections({sections, listItems}: CreateListSections): Section[] {
     if (listItems) {
@@ -84,13 +80,22 @@ function buildObjects({pages}:{pages: Page[]}) {
         allLinks.forEach(link => {
             page.blocks && page.blocks.forEach(block => {
                 if (link.type === "block" && link.id === block.key && link.page === block.page) {
-                    block.references.add(link)
+                    const object = {basename: link.file.basename, path:link.file.path, pos: link.pos}
+                    if (!isEquivalent(block.references, object)) {
+                        block.references = block.references ? block.references : new Set()
+                        block.references.add(object)
+                    }
                 }
                
             })
             page.headings && page.headings.forEach((heading) => {
                 if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
-                    heading.references.add(link)
+                    const object = {basename: link.file.basename, path:link.file.path, pos: link.pos}
+                    if (!isEquivalent(heading.references, object)) {
+                        heading.references = heading.references ? heading.references : new Set()
+                        heading.references.add(object)
+                    }
+
                 }
             })
         })  
@@ -107,7 +112,7 @@ function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
     pages.forEach(page => {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => ref.key === item.id && ref.page === item.page)
-            item.reference = {...ref, type: "link"}
+            item.reference = ref && {...ref, type: "link"}
         })
     })
 }
@@ -130,7 +135,6 @@ function findItems({items, file}: FindItems) {
                         file,
                         type: "block",
                         embed,
-                        reference: {}
                     }
                 )
             } 
@@ -143,11 +147,20 @@ function findItems({items, file}: FindItems) {
                         file,
                         type: "heading",
                         embed,
-                        reference: {}
                     }
                 )
             }
         })
     }
     return foundItems
+}
+
+function isEquivalent(set: Set<Reference>, object: Reference) {
+    let equiv = false
+    set && set.forEach((setObject) => {
+        if (setObject.pos === object.pos && setObject.path === object.path) {
+            equiv = true
+        }
+    })
+    return equiv
 }
