@@ -1,12 +1,26 @@
-import {App} from "obsidian"
+import {App, BlockCache, EmbedCache, HeadingCache, LinkCache, ListItemCache, SectionCache} from "obsidian"
 import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems, Reference} from "./types"
 
+/* global index of pages with associated block references */
 let pages: Page[] = []
 
+/**
+ * creates a copy of the pages index for use in building block ref buttons
+ *
+ * @return  {Page[]}  an aray of Page objects
+ */
 export function getPages(): Page[] {
     return [...pages]
 }
 
+/**
+ * Iterate markdown files in the value and builds the pages index with references using metadataCache. 
+ * Completes in ~100ms on a 2000 note vault on first run, and faster on each subsequent run.
+ *
+ * @param   {App}   app 
+ *
+ * @return  {void}
+ */
 export function indexBlockReferences({ app }: { app: App }): void {
     pages = []
     const files = app.vault.getMarkdownFiles()
@@ -20,10 +34,23 @@ export function indexBlockReferences({ app }: { app: App }): void {
     buildLinksAndEmbeds({pages})
 }
 
-
-function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray) {
+/**
+ * takes in metadataCache items and associated file and pushes the initial page object into the pages array
+ *
+ * @param   {EmbedCache}       embeds     embeds from metadataCache
+ * @param   {LinkCache}        links      links from metadataCache
+ * @param   {HeadingCache}     headings   headings from metadataCache
+ * @param   {BlockCache}       blocks     blocks from metadataCache
+ * @param   {SectionCache}     sections   sections from metadataCache
+ * @param   {ListItemCache}    listItems  listItems from metadataCache
+ * @param   {TFile}            file       current file being processec
+ *
+ * @return  {void}                      
+ */
+function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray): void{
     embeds = embeds ? [...embeds] : []
     links = links ? [...links] : []
+
     const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
         key,
         pos: block.position.start.line,
@@ -31,6 +58,7 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
         page: file.basename,
         type: "block"
     }))
+
     const headingsArray = headings && headings.map(header => ({
         key: header.heading,
         pos: header.position.start.line,
@@ -39,6 +67,7 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     }))
     const foundItems = findItems({items: [...embeds, ...links], file})
     const listSections = createListSections({sections, listItems})
+
     if (foundItems) {
         pages.push({
             items: foundItems,
@@ -51,6 +80,15 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     
 }
 
+/**
+ * If the section is of type list, add the list items from the metadataCache to the section object. 
+ * This makes it easier to iterate a list when building block ref buttons
+ *
+ * @param   {SectionCache}                sections  
+ * @param   {ListItemCache}               listItems  
+ *
+ * @return  {Section[]}                        Array of sections with additional items key
+ */
 function createListSections({sections, listItems}: CreateListSections): Section[] {
     if (listItems) {
         return sections.map(section => {
@@ -70,6 +108,15 @@ function createListSections({sections, listItems}: CreateListSections): Section[
     return sections
 }
 
+/**
+ * Go through every link reference and embed in the vault
+ * Add a reference to the link or embed on the associated block avoiding duplicates
+ * Do the same for headers
+ *
+ * @param   {Page[]}  pages  Array of pages from global pages index
+ *
+ * @return  {void}             
+ */
 function buildObjects({pages}:{pages: Page[]}) {
     const allLinks = pages.reduce((acc, page) => {
         acc.push(...page.items)
@@ -103,6 +150,14 @@ function buildObjects({pages}:{pages: Page[]}) {
  
 }
 
+/**
+ * Go through every block and heading in the vault
+ * Add a reference to the block or heading on the associated link
+ *
+ * @param   {Page[]}  pages  Array of pages from global pages index
+ *
+ * @return  {void}             
+ */
 function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
     const allRefs = pages.reduce((acc, page) => {
         page.blocks && acc.push(...page.blocks)
@@ -117,6 +172,14 @@ function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
     })
 }
 
+/**
+ * Creates an array of block-id links and embeds that exist in the vault
+ *
+ * @param   {EmbedCache & LinkCache[]}     items  Array of embeds and links
+ * @param   {TFile}  file   
+ *
+ * @return  {[type]}            [return description]
+ */
 function findItems({items, file}: FindItems) {
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
@@ -155,6 +218,15 @@ function findItems({items, file}: FindItems) {
     return foundItems
 }
 
+/**
+ * Utility function to compare an object to a Set of objects.
+ * If the object exists in the array returns true
+ *
+ * @param   {Set}    Reference  Set of objects to compare
+ * @param   {Reference}            object     reference to compare
+ *
+ * @return  {boolean}             true if object exists in Set
+ */
 function isEquivalent(set: Set<Reference>, object: Reference) {
     let equiv = false
     set && set.forEach((setObject) => {
