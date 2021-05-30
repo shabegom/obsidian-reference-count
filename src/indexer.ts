@@ -1,170 +1,153 @@
 import {App} from "obsidian"
-import { type } from "os"
-import {Index, Pages, EmbedOrLinkItem, BuildIndexObjects} from "./types"
+import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems} from "./types"
 
-const index: Index = {}
-const pages: Pages = {}
+let pages: Page[] = []
 
-export function getIndex(): Index {
-    return Object.assign({}, index)
-}
-
-export function getPages(): Pages {
-    return Object.assign({}, pages)
-}
-
-export function updateIndex(): void {
-    //console.log('updateIndex()')
-    Object.keys(index).forEach(key => {
-        index[key].count = 0
-        index[key].references.clear()
-    })
-    Object.values(pages).forEach(eachPage => {
-        eachPage.embeds.forEach(embed => {
-            let id
-            if (embed.type === 'block') {
-                id = `${embed.page}^${embed.id}`
-            } else {
-                id = `${embed.page}#${embed.id}`
-            }
-            if (index[id]) {
-                index[id].count++
-                index[id].references.add({ file: embed.file, line: embed.pos })
-            }
-        })
-        eachPage.links.forEach(link => {
-            let id
-            if (link.type === 'block') {
-                id = `${link.page}^${link.id}`
-            } else {
-                id = `${link.page}#${link.id}`
-            }
-            if (index[id]) {
-                index[id].count++
-                index[id].references.add({ file: link.file, line: link.pos })
-            }
-        })
-    })
-    //console.log(index);
+export function getPages(): Page[] {
+    return [...pages]
 }
 
 export function indexBlockReferences({ app }: { app: App }): void {
-    console.log("Full initial index!")
-    console.time("index")
+    pages = []
     const files = app.vault.getMarkdownFiles()
-    files.forEach(file => {
-        const { blocks, links, embeds } = app.metadataCache.getFileCache(file) || {}
-        buildIndexObjects({ blocks, embeds, links, file })
-    })
-    updateIndex()
-    console.timeEnd("index")
+    let i = 0
+    while (i < files.length) {
+        const { links, embeds, headings, blocks, sections, listItems} = app.metadataCache.getFileCache(files[i])
+        buildPagesArray({embeds, links, headings, blocks, sections, listItems, file: files[i]})
+        i++
+    }
+    buildObjects({pages})
+    buildLinksAndEmbeds({pages})
 }
 
-export function buildIndexObjects({blocks, embeds, links, file}: BuildIndexObjects): void {
-    if (pages[file.path]) { delete pages[file.path] }
-
-    if (blocks) {
-        Object.values(blocks).forEach((block) => {
-            const newid = `${file.basename}^${block.id}`
-            index[newid] = {
-                count: 0,
-                id: newid,
-                file: file,
-                references: new Set(),
-                type: 'block'
-            }
+function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray) {
+    embeds = embeds ? embeds : []
+    links = links ? links : []
+    const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
+        key,
+        pos: block.position.start.line,
+        id: block.id,
+        references: new Set(),
+        page: file.basename,
+        type: "block"
+    }))
+    const headingsArray = headings && headings.map(header => ({
+        key: header.heading,
+        pos: header.position.start.line,
+        references: new Set(),
+        page: file.basename,
+        type: "header"
+    }))
+    const foundItems = findItems({items: [...embeds, ...links], file})
+    const listSections = createListSections({sections, listItems})
+    if (foundItems) {
+        pages.push({
+            items: foundItems,
+            headings: headingsArray,
+            blocks: blocksArray,
+            file,
+            sections: listSections
         })
     }
-    const foundEmbeds: EmbedOrLinkItem[] = []
-    if (embeds) {
-        embeds.forEach(embed => {
-            let split = embed.link.split("^")
-            const id = split[1]
+    
+}
+
+
+
+
+function createListSections({sections, listItems}: CreateListSections): Section[] {
+    if (listItems) {
+        return sections.map(section => {
+            const items: ListItem[]  = []
+            if (section.type === "list") {
+                listItems.forEach((item)=> {
+                    if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
+                        items.push({pos: item.position.start.line, ...item})
+                    }
+                })
+                const sectionWithItems = {items, ...section}
+                return sectionWithItems
+            }
+            return section
+        })
+    }
+    return sections
+}
+
+function buildObjects({pages}:{pages: Page[]}) {
+    const allLinks = pages.reduce((acc, page) => {
+        acc.push(...page.items)
+        return acc
+    }, [])
+    
+    pages.forEach(page => {
+        allLinks.forEach(link => {
+            page.blocks && page.blocks.forEach(block => {
+                if (link.type === "block" && link.id === block.key && link.page === block.page) {
+                    block.references.add(link)
+                }
+               
+            })
+            page.headings && page.headings.forEach((heading) => {
+                if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
+                    heading.references.add(link)
+                }
+            })
+        })  
+    })
+ 
+}
+
+function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
+    const allRefs = pages.reduce((acc, page) => {
+        page.blocks && acc.push(...page.blocks)
+        page.headings && acc.push(...page.headings)
+        return acc
+    }, [])
+    pages.forEach(page => {
+        page.items && page.items.forEach(item => {
+            const ref = allRefs.find(ref => ref.key === item.id && ref.page === item.page)
+            item.reference = {...ref, type: "link"}
+        })
+    })
+}
+
+function findItems({items, file}: FindItems) {
+    const foundItems: EmbedOrLinkItem[] = []
+    if (items) {
+        items.forEach(item => {
+            const [note, id] = item.link.split("^")
+            const pos = item.position.start.line
+            const page = note.split("#")[0] ? note.split("#")[0] : file.basename
+            const header = item.link.match(/.*#(.*)/)
+            const embed = item.original.match(/^!/) ? true : false
             if (id) {
-                const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
-                foundEmbeds.push(
+                foundItems.push(
                     {
                         id,
-                        file,
-                        pos: embed.position.start.line,
+                        pos,
                         page,
-                        type: 'block'
+                        file,
+                        type: "block",
+                        embed,
+                        reference: {}
                     }
                 )
-            } else {
-                split = embed.link.split("#")
-                const header: string = split[1]
-                if (header) {
-                    const page = (split[0] ? split[0] : file.basename)
-                    foundEmbeds.push(
-                        {
-                            id: header,
-                            file,
-                            pos: embed.position.start.line,
-                            page,
-                            type: 'header'
-                        }
-                    )
-                    const newid = embed.link
-                    index[newid] = {
-                        count: 0,
-                        id: newid,
-                        file: file,
-                        references: new Set(),
-                        type: 'header'
-                    }
-                }
-            }
-        })
-    }
-
-    const foundLinks: EmbedOrLinkItem[] = []
-    if (links) {
-        links.forEach(link => {
-            let split = link.link.split("^")
-            const id = split[1]
-            if (id) {
-                const page = (split[0].split("#")[0] ? split[0].split("#")[0] : file.basename)
-                foundEmbeds.push(
+            } 
+            if (header && header[1] && !header[1].startsWith("^")) {
+                foundItems.push(
                     {
-                        id,
-                        file,
-                        pos: link.position.start.line,
+                        id: header[1],
+                        pos,
                         page,
-                        type: 'block'
+                        file,
+                        type: "heading",
+                        embed,
+                        reference: {}
                     }
                 )
-            } else {
-                split = link.link.split("#")
-                const header: string = split[1]
-                if (header) {
-                    const page = (split[0] ? split[0] : file.basename)
-                    foundEmbeds.push(
-                        {
-                            id: header,
-                            file,
-                            pos: link.position.start.line,
-                            page,
-                            type: 'header'
-                        }
-                    )
-                    const newid = link.link
-                    index[newid] = {
-                        count: 0,
-                        id: newid,
-                        file: file,
-                        references: new Set(),
-                        type: 'header'
-                    }
-                }
             }
         })
     }
-
-    if (foundEmbeds.length > 0 || foundLinks.length > 0) {
-        pages[file.path] = {
-            embeds: foundEmbeds,
-            links: foundLinks
-        }
-    }
+    return foundItems
 }

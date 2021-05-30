@@ -1,51 +1,45 @@
-import { App, ListItemCache, EventRef, Plugin, TFile, MarkdownPreviewView, WorkspaceLeaf, BlockCache, EmbedCache, LinkCache, HeadingCache } from "obsidian"
-import { AddBlockReferences, CreateButtonElement, EmbedOrLinkItem, FileRef, } from "./types"
-import { indexBlockReferences, buildIndexObjects, updateIndex, getIndex, getPages } from "./indexer"
+import { App, EventRef, Plugin,   WorkspaceLeaf } from "obsidian"
+import { AddBlockReferences, CreateButtonElement, FileRef, AddHeaderReferences, Heading, AddLinkReferences } from "./types"
+import { indexBlockReferences, getPages } from "./indexer"
 
 export default class BlockRefCounter extends Plugin {
     private cacheUpdate: EventRef;
     private layoutReady: EventRef;
     private layoutChange: EventRef;
     private activeLeafChange: EventRef;
+    private newFile: EventRef;
+    private deleteFile: EventRef;
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
 
         if (!this.app.workspace.layoutReady) {
-            this.layoutReady = this.app.workspace.on("layout-ready", async () => indexBlockReferences({app: this.app}))
+            this.layoutReady = this.app.workspace.on("layout-ready", () => indexBlockReferences({app: this.app}))
         } else {
             indexBlockReferences({app: this.app})
         }
+ 
 
-        this.cacheUpdate = this.app.metadataCache.on("changed", (file) => {
-            console.log("updating cache: " + file.basename)
-            const {blocks, embeds, links} = this.app.metadataCache.getFileCache(file)
-            buildIndexObjects({ blocks, embeds, links, file })
-            updateIndex()
-            //createPreviewView({app: this.app})
+        this.cacheUpdate = this.app.metadataCache.on("changed", () => {
+            indexBlockReferences({app: this.app})
+            createPreviewView({app: this.app})
+        })
+
+        this.deleteFile = this.app.vault.on("delete", () => {
+            indexBlockReferences({app: this.app})
+            createPreviewView({app: this.app})
         })
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
-            console.log("layout change")
-            const thisApp = this.app
-            if (thisApp) {
-                if (thisApp.workspace.activeLeaf.view.previewMode) {
-                    thisApp.workspace.activeLeaf.view.previewMode.renderer.onRendered(function () {
-                        //For whatever reason, needed to reset this here otherwise it was re-rendering itself again and running the createPreviewView() twice
-                        thisApp.workspace.activeLeaf.view.previewMode.renderer.onRendered(function () { })
-                        createPreviewView({ app: thisApp }, 'layout')
-                    })
-                }
-            }
+            this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(() => {
+                createPreviewView({ app: this.app })
+            })
+
         })
 
         this.activeLeafChange = this.app.workspace.on("active-leaf-change", (leaf) => {
-            console.log("active leaf change")
-            createPreviewView({ leaf, app: this.app }, 'leaf')
+            createPreviewView({ leaf, app: this.app })
         })
 
-        this.registerMarkdownPostProcessor((val, ctx) => {
-            //addBlockReferences({app: this.app, ctx, val})
-        })
     }
 
     onunload(): void {
@@ -54,175 +48,110 @@ export default class BlockRefCounter extends Plugin {
         this.app.workspace.offref(this.layoutReady)
         this.app.workspace.offref(this.layoutChange)
         this.app.workspace.offref(this.activeLeafChange)
+        this.app.workspace.offref(this.newFile)
+        this.app.workspace.offref(this.deleteFile)
     }
 }
 
-function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }, callSource: string) {
-    console.log('createPreviewView() from: ' + callSource)
+
+
+function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
     const view = leaf ?  leaf.view : app.workspace.activeLeaf.view
     const sourcePath = view.file?.path
-    const mdCache = app.metadataCache.getCache(sourcePath)
-    const { listItems, sections } = mdCache || {}
-    let listSections: any
-    if (sections && listItems) {
-        listSections = sections.filter(section => section.type === "list").map(section => {
-            const items: ListItemCache[] = []
-            listItems.forEach(item => {
-                if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
-                    items.push(item)
-                }
-            })
-            return { section, items }
-        })
-    }
-
-    const mdSections = view.previewMode?.renderer.sections
-    if (sourcePath && mdSections) {
-        const blockRefs = getIndex()
-        mdSections.forEach((section: { lineStart: number; lineEnd: number; el: HTMLElement; }) => {
-            const lineStart = section.lineStart
-            const lineEnd = section.lineEnd
-            const val = section.el
-            const getSectionInfo = (val: HTMLElement) => ({ val, lineStart, lineEnd, text: "" })
-            addBlockReferences({ app: app, ctx: { getSectionInfo, sourcePath }, val, mdCache: mdCache, listSections: listSections, actView: view, blockRefs: blockRefs })
-        })
-    }
+    const elements = view.previewMode?.renderer?.sections
+    const page = getPages().reduce((acc, page) => {
+        if (page.file.path === sourcePath) {
+            acc = page
+        }
+        return acc
+    })
+    elements && elements.forEach((section, index) => {
+        const pageSection = page.sections[index]
+        if (pageSection) {
+            pageSection.pos = pageSection.position.start.line
+            const type = pageSection?.type
+            if (page.items) {
+                addLinkReferences({app, val: section.el, links: page.items, section: pageSection})
+            }
+            if (page.blocks && type === "paragraph" || type === "list")
+                addBlockReferences({app, val: section.el, blocks: page.blocks, section: pageSection})
+            if (page.headings && type === "heading") {
+                addHeaderReferences({app, val: section.el, headings: page.headings, section: pageSection})
+            }
+        }
+        
+    })
 }
 
-function addBlockReferences({ app, ctx, val, mdCache, listSections, actView, blockRefs }: AddBlockReferences): void {
-    const { lineStart, lineEnd } = ctx.getSectionInfo(val) || {}
-    //console.log(`markdownPostProcessor: Ln${lineStart}-${lineEnd}`)
-    const { blocks, listItems, headings } = mdCache || {}
-    const pageLinks = getPages();
-    const foundPage = pageLinks[ctx.sourcePath];
-    let matchedBlock: BlockCache[] = []
-    let matchedHeading: HeadingCache[] = []
-    let matchedEmbed: EmbedOrLinkItem[] = []
-    let matchedLink: EmbedOrLinkItem[] = []
-
-    if (blocks) {
-        matchedBlock = Object.values(blocks).filter((eachBlock) => {
-            if (eachBlock.position.start.line >= lineStart && eachBlock.position.end.line <= lineEnd) { return true } else { return false }
+function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): void {
+    blocks && blocks.forEach(block => {
+        section.type === "paragraph" && block.id === section.id &&  createButtonElement({app, block, val})
+        section.type === "list" && section.items.forEach((item, index: number) => {
+            const buttons = val.querySelectorAll("li")
+            item.id === block.key && createButtonElement({app, block, val: buttons[index]})
         })
-    }
-    if (headings && matchedBlock.length === 0) {
-        matchedHeading = Object.values(headings).filter((eachHead) => {
-            if (eachHead.position.start.line >= lineStart && eachHead.position.end.line <= lineEnd) { return true } else { return false }
-        })
-    }
-    if (foundPage && matchedBlock.length === 0 && matchedHeading.length === 0) {
-        if (foundPage.embeds) {
-            matchedEmbed = Object.values(foundPage.embeds).filter((eachEmbed) => { if (eachEmbed.pos >= lineStart && eachEmbed.pos <= lineEnd) { return true } else { return false } })
-        }
-        if (matchedEmbed.length === 0 && foundPage.links) {
-            matchedLink = Object.values(foundPage.links).filter((eachLink) => { if (eachLink.pos >= lineStart && eachLink.pos <= lineEnd) { return true } else { return false } })
-        }
-    }
-    if (matchedBlock.length > 0) {
-        //console.log("addBlockReferences: matchedBlock: Ln-" + lineStart)
-        const listElements = val.querySelectorAll("li")
-        Object.values(matchedBlock).forEach(eachBlock => {
-            const myId = `${actView.file.basename}^${eachBlock.id}`
-            if (blockRefs[myId] && blockRefs[myId].count >= 0) {
-                if (listItems && listElements.length > 0) {
-                    listSections.forEach((section) => {
-                        section.items.forEach((listItem, index) => {
-                            if (listItem.id === eachBlock.id && lineStart === section.section.position.start.line) {
-                                if (listElements.item(index)) {
-                                    createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
-                                }
-                            }
-                        })
-                    })
-                } else {
-                    createButtonElement({ app, blockRefs: blockRefs[myId], val })
-                }
-            }
-        })
-    } else if (matchedHeading.length > 0) {
-        //console.log("addBlockReferences: matchedHeading: Ln-" + lineStart)
-        Object.values(matchedHeading).forEach(eachHead => {
-            const myId = `${actView.file.basename}#${eachHead.heading}`
-            if (blockRefs[myId] && blockRefs[myId].count >= 0) {
-                createButtonElement({ app, blockRefs: blockRefs[myId], val })
-            }
-        })
-    } else if (matchedEmbed.length > 0) {
-        //console.log("addBlockReferences: matchedEmbed: Ln-" + lineStart)
-        const listElements = val.querySelectorAll("li")
-        Object.values(matchedEmbed).forEach(eachEmbed => {
-            let myId: string
-            if (eachEmbed.type === 'block') {
-                myId = `${eachEmbed.page}^${eachEmbed.id}`
-            } else {
-                myId = `${eachEmbed.page}#${eachEmbed.id}`
-            }
-            if (blockRefs[myId] && blockRefs[myId].count > 0) {
-                if (listItems && listElements.length > 0) {
-                    listSections.forEach((section) => {
-                        section.items.forEach((listItem, index) => {
-                            if (listItem.id === eachEmbed.id && lineStart === section.section.position.start.line) {
-                                if (listElements.item(index)) {
-                                    createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
-                                }
-                            }
-                        })
-                    })
-                } else {
-                    createButtonElement({ app, blockRefs: blockRefs[myId], val })
-                }
-            }
-        })
-    } else if (matchedLink.length > 0) {
-        //console.log("addBlockReferences: matchedLink: Ln-" + lineStart)
-        const listElements = val.querySelectorAll("li")
-        Object.values(matchedLink).forEach(eachLink => {
-            let myId: string
-            if (eachLink.type === 'block') {
-                myId = `${eachLink.page}^${eachLink.id}`
-            } else {
-                myId = `${eachLink.page}#${eachLink.id}`
-            }
-            if (blockRefs[myId] && blockRefs[myId].count > 0) {
-                if (listItems && listElements.length > 0) {
-                    listSections.forEach((section) => {
-                        section.items.forEach((listItem, index) => {
-                            if (listItem.id === eachLink.id && lineStart === section.section.position.start.line) {
-                                if (listElements.item(index)) {
-                                    createButtonElement({ app, blockRefs: blockRefs[myId], val: listElements.item(index) })
-                                }
-                            }
-                        })
-                    })
-                } else {
-                    createButtonElement({ app, blockRefs: blockRefs[myId], val })
-                }
-            }
-        })
-    }
+    })
+    
+    
 }
 
-function createButtonElement({ app, blockRefs, val }: CreateButtonElement): void {
-    console.log(`createButtonElement: ${blockRefs.count}: ${blockRefs.file.basename}: ${blockRefs.id}`)
-    const existingButton = val.querySelectorAll(".count").item(0)
-    const countEl = createEl("button", { cls: "count" })
-    countEl.innerText = blockRefs.count.toString()
-    const refTable: HTMLElement = createTable({app, val, files: Array.from(blockRefs.references)})
-    countEl.on("click", "button", () => {
-        if (val.lastChild.previousSibling !== refTable) {
-            val.insertBefore(refTable, val.lastChild)
-        } else {
-            val.removeChild(refTable)
+function addLinkReferences({app, val, links, section}: AddLinkReferences) {
+    links && links.forEach(link => {
+        if (section.type === "paragraph" && section.pos === link.pos) {
+            const embedLink = link.embed ? val.querySelectorAll(".markdown-embed-link").item(0) : undefined
+            embedLink && createButtonElement({app, block: link.reference, val: embedLink.parentElement})
+            !embedLink && createButtonElement({app, block: link.reference, val: val})
+        }
+        if (section.type === "list") {
+            section.items.forEach((item, index: number) => {
+                const buttons = val.querySelectorAll("li")
+                const embedLink = link.embed ? val.querySelectorAll(".markdown-embed-link").item(0) : undefined
+                embedLink && createButtonElement({app, block: link.reference, val: embedLink.parentElement})
+                if (!embedLink && item.pos === link.pos) {
+                    link.reference.type = "block"
+                    createButtonElement({app, block: link.reference, val: buttons[index]})
+                }
+            }) 
         }
     })
-    existingButton && existingButton.remove()
-    if (blockRefs.count > 0) {
-        val.prepend(countEl)
+}
+
+function addHeaderReferences({app, val, headings, section}: AddHeaderReferences) {
+    if (headings) {
+        headings.forEach((header: Heading) => {
+            header.pos === section.pos && createButtonElement({app, block: header, val})
+        })
     }
+}
+
+function createButtonElement({ app, block, val }: CreateButtonElement): void {
+    const refs = block.references ? Array.from(block.references) : undefined
+    const count = refs ? refs.length : 0
+    const existingButton = val.querySelector("#count")
+    const countEl = createEl("button", { cls: "count" })
+    countEl.setAttribute("id", "count")
+    countEl.innerText = count.toString()
+    const refTable: HTMLElement = createTable({app, val, files: refs})
+    countEl.on("click", "button", () => {
+        if (!val.children.namedItem("ref-table")) {
+            block.type === "block"  && val.insertBefore(refTable, val.lastChild)
+            block.type === "header" && val.appendChild(refTable)
+            block.type === "link" && val.append(refTable)
+        } else {
+            if (val.children.namedItem("ref-table")) {
+                val.removeChild(refTable)
+            }
+        }
+    })
+    if (existingButton) {
+        existingButton.remove()
+    }
+    count > 0 && val.prepend(countEl)
 }
 
 function createTable({app, val, files}: {app: App, val: HTMLElement, files: FileRef[]}) {
     const refTable = createEl("table", {cls: "ref-table"})
+    refTable.setAttribute("id", "ref-table")
     const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
     const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
     const removeTable = createEl("button", {text: "❌" })
@@ -231,8 +160,8 @@ function createTable({app, val, files}: {app: App, val: HTMLElement, files: File
     refTable.appendChild(noteHeaderRow)
     refTable.appendChild(lineHeaderRow)
     refTable.appendChild(removeTable)
-    files.forEach(async ( fileRef ) => {
-        const lineContent = await app.vault.cachedRead(fileRef.file).then(content => content.split("\n")[fileRef.line])
+    files && files.forEach(async ( fileRef ) => {
+        const lineContent = await app.vault.cachedRead(fileRef.file).then(content => content.split("\n")[fileRef.pos])
         const row = createEl("tr")
         const noteCell = createEl("td")
         const lineCell = createEl("td")
