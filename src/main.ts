@@ -111,9 +111,10 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
                 const type = pageSection?.type
                 // find embeds because their section.type is paragraph but they need to be processed differently
                 const embedLinks = section.el.querySelectorAll(".markdown-embed")
-                if (page.blocks && !embedLinks && type === "paragraph" || type === "list")
+                const hasEmbed = embedLinks.length > 0 ? true : false
+                if (page.blocks && !hasEmbed && type === "paragraph" || type === "list") {
                     addBlockReferences({app, val: section.el, blocks: page.blocks, section: pageSection})
-
+                }
                 if (page.headings && type === "heading") {
                     addHeaderReferences({app, val: section.el, headings: page.headings, section: pageSection})
                 }
@@ -143,7 +144,7 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
  */
 function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): void {
     blocks && blocks.forEach(block => {
-        section.type === "paragraph" && block.id === section.id &&  createButtonElement({app, block, val})
+        section.type === "paragraph" && block.key === section.id &&  createButtonElement({app, block, val})
         // Iterate each list item and add the button to items with block-ids
         section.type === "list" && section.items.forEach((item, index: number) => {
             const buttons = val.querySelectorAll("li")

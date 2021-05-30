@@ -67,8 +67,6 @@ export interface Heading {
 export interface Block {
          key: string
         pos: number
-        id: string
-
         references?: Set<Reference>
         page: string
         type: string
