@@ -111,9 +111,7 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
                 const type = pageSection?.type
                 // find embeds because their section.type is paragraph but they need to be processed differently
                 const embedLinks = section.el.querySelectorAll(".markdown-embed")
-                const embedLink = embedLinks ? embedLinks.item(0) : undefined
-
-                if (page.blocks && !embedLink && type === "paragraph" || type === "list")
+                if (page.blocks && !embedLinks && type === "paragraph" || type === "list")
                     addBlockReferences({app, val: section.el, blocks: page.blocks, section: pageSection})
 
                 if (page.headings && type === "heading") {
@@ -121,7 +119,7 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
                 }
 
                 if (page.items) {
-                    addLinkReferences({app, val: section.el, links: page.items, section: pageSection, embedLink})
+                    addLinkReferences({app, val: section.el, links: page.items, section: pageSection, embedLinks})
                 }
             }
         
@@ -167,18 +165,23 @@ function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): v
  *
  * @return  {void}
  */
-function addLinkReferences({app, val, links, section, embedLink}: AddLinkReferences) {
+function addLinkReferences({app, val, links, section, embedLinks}: AddLinkReferences) {
     links.forEach(link => {
+        console.log(link)
         if (section.type === "paragraph" && section.pos === link.pos) {
+            embedLinks && embedLinks.forEach(embedLink => {
             link.reference && embedLink && createButtonElement({app, block: link.reference, val: embedLink})
-            link.reference && !embedLink && createButtonElement({app, block: link.reference, val})
+            })
+            link.reference && !link.embed && createButtonElement({app, block: link.reference, val})
         }
         // Have to iterate list items so the button gets attached to the right element
         if (section.type === "list") {
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li")
+                embedLinks && embedLinks.forEach(embedLink => {
                 link.reference && embedLink && createButtonElement({app, block: link.reference, val: embedLink})
-                if (link.reference && !embedLink && item.pos === link.pos) {
+                })
+                if (link.reference && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
 
                     link.reference.type = "block"
@@ -289,7 +292,15 @@ function createTable({app, val, files}: {app: App, val: HTMLElement | Element, f
 
 }
 
-function unloadButtons(app: App) {
+/**
+ * if there are block reference buttons in the current view, remove them
+ * used when the plugin is unloaded
+ *
+ * @param   {App}  app  
+ *
+ * @return  {void}   
+ */
+function unloadButtons(app: App): void {
     const buttons = app.workspace.activeLeaf.containerEl.querySelectorAll('#count')
    buttons && buttons.forEach((button: HTMLElement) => button.remove())
 }

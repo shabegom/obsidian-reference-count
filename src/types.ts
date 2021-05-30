@@ -134,7 +134,7 @@ export interface AddLinkReferences {
   val: HTMLElement
   links: EmbedOrLinkItem[]
   section: Section
-  embedLink: Element
+  embedLinks: NodeListOf<Element>
 }
 
 export interface Reference {
