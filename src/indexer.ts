@@ -57,11 +57,9 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
     links = links ? [...links] : []
 
 
-    const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
-        key,
+    const blocksArray = blocks && Object.values(blocks).map((block) => ({
+        key: block.id,
         pos: block.position.start.line,
-        id: block.id,
-
         page: file.basename,
         type: "block"
     }))
