@@ -76,6 +76,7 @@ export default class BlockRefCounter extends Plugin {
         this.app.workspace.offref(this.layoutChange)
         this.app.workspace.offref(this.activeLeafChange)
         this.app.workspace.offref(this.deleteFile)
+        unloadButtons(this.app)
     }
 }
 
@@ -286,4 +287,9 @@ function createTable({app, val, files}: {app: App, val: HTMLElement | Element, f
     })
     return refTable
 
+}
+
+function unloadButtons(app: App) {
+    const buttons = app.workspace.activeLeaf.containerEl.querySelectorAll('#count')
+   buttons && buttons.forEach((button: HTMLElement) => button.remove())
 }
