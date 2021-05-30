@@ -1,5 +1,5 @@
 import {App} from "obsidian"
-import {Page, EmbedOrLinkItem, BuildPagesArray} from "./types"
+import {Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems} from "./types"
 
 let pages: Page[] = []
 
@@ -23,7 +23,7 @@ export function indexBlockReferences({ app }: { app: App }): void {
 function buildPagesArray({embeds, links, headings, blocks, sections, listItems, file}: BuildPagesArray) {
     embeds = embeds ? embeds : []
     links = links ? links : []
-    blocks = blocks && Object.entries(blocks).map(([key, block]) => ({
+    const blocksArray = blocks && Object.entries(blocks).map(([key, block]) => ({
         key,
         pos: block.position.start.line,
         id: block.id,
@@ -31,20 +31,20 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
         page: file.basename,
         type: "block"
     }))
-    headings = headings && headings.map(header => ({
+    const headingsArray = headings && headings.map(header => ({
         key: header.heading,
         pos: header.position.start.line,
         references: new Set(),
         page: file.basename,
         type: "header"
     }))
-    const foundItems = findItems([...embeds, ...links], file)
+    const foundItems = findItems({items: [...embeds, ...links], file})
     const listSections = createListSections({sections, listItems})
     if (foundItems) {
         pages.push({
             items: foundItems,
-            headings,
-            blocks,
+            headings: headingsArray,
+            blocks: blocksArray,
             file,
             sections: listSections
         })
@@ -55,18 +55,18 @@ function buildPagesArray({embeds, links, headings, blocks, sections, listItems, 
 
 
 
-function createListSections({sections, listItems}) {
+function createListSections({sections, listItems}: CreateListSections): Section[] {
     if (listItems) {
         return sections.map(section => {
-            const items: ListItemCache[] = []
+            const items: ListItem[]  = []
             if (section.type === "list") {
                 listItems.forEach((item)=> {
                     if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
                         items.push({pos: item.position.start.line, ...item})
                     }
                 })
-                section.items = items
-                return section
+                const sectionWithItems = {items, ...section}
+                return sectionWithItems
             }
             return section
         })
@@ -74,7 +74,7 @@ function createListSections({sections, listItems}) {
     return sections
 }
 
-function buildObjects({pages}) {
+function buildObjects({pages}:{pages: Page[]}) {
     const allLinks = pages.reduce((acc, page) => {
         acc.push(...page.items)
         return acc
@@ -98,7 +98,7 @@ function buildObjects({pages}) {
  
 }
 
-function buildLinksAndEmbeds({pages}) {
+function buildLinksAndEmbeds({pages}:{pages: Page[]}) {
     const allRefs = pages.reduce((acc, page) => {
         page.blocks && acc.push(...page.blocks)
         page.headings && acc.push(...page.headings)
@@ -112,8 +112,7 @@ function buildLinksAndEmbeds({pages}) {
     })
 }
 
-
-function findItems(items, file) {
+function findItems({items, file}: FindItems) {
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
         items.forEach(item => {

@@ -1,32 +1,30 @@
-import { App, MarkdownPostProcessorContext, TFile, BlockCache, LinkCache, EmbedCache, MetadataCache, CachedMetadata, WorkspaceLeaf, SectionCache, View, ListItemCache, HeadingCache } from "obsidian"
+import { App, TFile, BlockCache, LinkCache, EmbedCache, SectionCache, ListItemCache, HeadingCache, Pos } from "obsidian"
 
 declare module "obsidian" {
   interface View {
     file: TFile
-    previewMode: {renderer: {onRendered: () => void, sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}
+    previewMode: {renderer: {onRendered: (arg0: unknown) => void, sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}
   }
 }
 
 export interface AddBlockReferences {
   app: App
-  ctx: MarkdownPostProcessorContext | { sourcePath: string, getSectionInfo: (val: HTMLElement) => void }
   val: HTMLElement
-  mdCache: CachedMetadata
-  listSections: any
-  actView: View
-  blockRefs: Index
+  blocks: Block[]
+  section: Section
 }
 
 export interface CreateButtonElement {
   app: App
-  block: BlockObject
+  block: Block | Heading | Record<string, void>
   val: HTMLElement
 }
 
 
 export interface FileRef {
-  file: TFile
-  line: number
+  file?: TFile
+  line?: number
+  pos?: number
 }
 
 interface IndexItemReference {
@@ -52,31 +50,37 @@ export interface EmbedOrLinkItem {
   file: TFile
   page: string
   type: string
+  embed: boolean
+  reference?: Block | Record<string, void>
 }
 
-interface Heading {
+export interface Heading {
           key: string
         pos: number
-        references: Set<any>
+        references: Set<Record<string, EmbedOrLinkItem>> | Set<unknown>
         page: string
         type: string
 }
 
-interface Block {
+export interface Block {
          key: string
         pos: number
         id: string
-        references: Set<any>
+        references: Set<Record<string, EmbedOrLinkItem>> | Set<unknown>
         page: string
         type: string
 }
 
-interface ListItem extends ListItemCache {
+export interface ListItem extends ListItemCache {
   pos: number
 }
 
-interface Section extends SectionCache {
-  items: ListItem[]
+export interface Section {
+  id?: string
+  items?: ListItem[]
+  position: Pos
+  pos?: number
+  type: string
 }
 
 export interface Page {
@@ -102,4 +106,28 @@ export interface BuildPagesArray {
   sections: SectionCache[]
   listItems: ListItemCache[]
   file: TFile
+}
+
+export interface CreateListSections {
+  sections: SectionCache[]
+  listItems: ListItemCache[]
+}
+
+export interface FindItems {
+  items: EmbedCache[] | LinkCache[]
+  file: TFile
+}
+
+export interface AddHeaderReferences {
+  app: App
+  val: HTMLElement
+  headings: Heading[]
+  section: Section
+}
+
+export interface AddLinkReferences {
+  app: App
+  val: HTMLElement
+  links: EmbedOrLinkItem[]
+  section: Section
 }

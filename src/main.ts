@@ -1,5 +1,5 @@
-import { App, EventRef, Plugin,   WorkspaceLeaf,  } from "obsidian"
-import { AddBlockReferences, CreateButtonElement, FileRef, } from "./types"
+import { App, EventRef, Plugin,   WorkspaceLeaf } from "obsidian"
+import { AddBlockReferences, CreateButtonElement, FileRef, AddHeaderReferences, Heading, AddLinkReferences } from "./types"
 import { indexBlockReferences, getPages } from "./indexer"
 
 export default class BlockRefCounter extends Plugin {
@@ -19,12 +19,12 @@ export default class BlockRefCounter extends Plugin {
         }
  
 
-        this.cacheUpdate = this.app.metadataCache.on("changed", (file) => {
+        this.cacheUpdate = this.app.metadataCache.on("changed", () => {
             indexBlockReferences({app: this.app})
             createPreviewView({app: this.app})
         })
 
-        this.deleteFile = this.app.vault.on("delete", (file) => {
+        this.deleteFile = this.app.vault.on("delete", () => {
             indexBlockReferences({app: this.app})
             createPreviewView({app: this.app})
         })
@@ -86,7 +86,7 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf, app: App }) {
 function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): void {
     blocks && blocks.forEach(block => {
         section.type === "paragraph" && block.id === section.id &&  createButtonElement({app, block, val})
-        section.type === "list" && section.items.forEach((item, index) => {
+        section.type === "list" && section.items.forEach((item, index: number) => {
             const buttons = val.querySelectorAll("li")
             item.id === block.key && createButtonElement({app, block, val: buttons[index]})
         })
@@ -95,7 +95,7 @@ function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): v
     
 }
 
-function addLinkReferences({app, val, links, section}) {
+function addLinkReferences({app, val, links, section}: AddLinkReferences) {
     links && links.forEach(link => {
         if (section.type === "paragraph" && section.pos === link.pos) {
             const embedLink = link.embed ? val.querySelectorAll(".markdown-embed-link").item(0) : undefined
@@ -103,7 +103,7 @@ function addLinkReferences({app, val, links, section}) {
             !embedLink && createButtonElement({app, block: link.reference, val: val})
         }
         if (section.type === "list") {
-            section.items.forEach((item, index) => {
+            section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li")
                 const embedLink = link.embed ? val.querySelectorAll(".markdown-embed-link").item(0) : undefined
                 embedLink && createButtonElement({app, block: link.reference, val: embedLink.parentElement})
@@ -116,9 +116,9 @@ function addLinkReferences({app, val, links, section}) {
     })
 }
 
-function addHeaderReferences({app, val, headings, section}) {
+function addHeaderReferences({app, val, headings, section}: AddHeaderReferences) {
     if (headings) {
-        headings.forEach(header => {
+        headings.forEach((header: Heading) => {
             header.pos === section.pos && createButtonElement({app, block: header, val})
         })
     }
