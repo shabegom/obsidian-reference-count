@@ -1,6 +1,9 @@
 # Obsidian Block Reference Counts
 **By shabegom and Murf**
 
+[![](img/brc.png)](https://youtu.be/gxEyKJ0Z7Qs)
+[Click Here to Watch the Release Video](https://youtu.be/gxEyKJ0Z7Qs)
+
 ![](img/readme.png)
 
 Show the amount of references you have in:
