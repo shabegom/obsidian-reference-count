@@ -167,7 +167,6 @@ function addBlockReferences({ app, val, blocks, section}: AddBlockReferences): v
  */
 function addLinkReferences({app, val, links, section, embedLinks}: AddLinkReferences) {
     links.forEach(link => {
-        console.log(link)
         if (section.type === "paragraph" && section.pos === link.pos) {
             embedLinks && embedLinks.forEach(embedLink => {
             link.reference && embedLink && createButtonElement({app, block: link.reference, val: embedLink})
