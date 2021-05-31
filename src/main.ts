@@ -38,9 +38,12 @@ export default class BlockRefCounter extends Plugin {
             createPreviewView({ app: this.app })
         }
 
-        
+        this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
+            const newView: View = this.app.viewRegistry.getViewCreatorByType("search")(leaf);
+            newView.getViewType = () => "search-ref";
+            return newView;
+        })
 
-        
  
 /**
  * Event listeners to re-index notes if the cache changes or a note is deleted
@@ -230,18 +233,38 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
     countEl.setAttribute("id", "count")
     countEl.innerText = count.toString()
 
-    const refTable: HTMLElement = createTable({app, val, files: block.references})
-
-    countEl.on("click", "button", () => {
-        if (!val.children.namedItem("ref-table")) {
+    countEl.on("click", "button", async () => {
+        const tempLeaf = app.workspace.getRightLeaf(false);
+        await tempLeaf.setViewState({ type: 'search-ref', state: {query: `file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`} });
+        const search = app.workspace.getLeavesOfType('search-ref')
+        const searchElement = search[search.length - 1].view.containerEl
+        const query = searchElement.querySelector('.search-input-container')
+        const toolbar = searchElement.querySelector('.nav-buttons-container')
+        query.setAttribute("style", "display: none")
+        const closeButton = createEl("button", {cls: "search-input-clear-button"})
+        closeButton.setAttribute("style", "background: transparent; margin-top: 7px; margin-right: 130px")
+        closeButton.on('click', 'button', () => {
+                val.removeChild(searchElement)
+                app.workspace.getLeavesOfType('search-ref').forEach(leaf => {
+                    const container = leaf.view.containerEl
+                    leaf.detach()
+                })
+        })
+        toolbar.append(closeButton)
+        searchElement.setAttribute("style", "height: 500px")
+        searchElement.setAttribute("id", `search-ref`)
+        searchElement.setAttribute("data-search-ref-num", `${search.length - 1}`)
+        if (!val.children.namedItem("search-ref")) {
+            search[search.length - 1].view.searchQuery
             // depending on the type of block the table needs to be inserted into the DOM at different points
-
-            block.type === "block"  && val.insertBefore(refTable, val.lastChild)
-            block.type === "header" && val.appendChild(refTable)
-            block.type === "link" && val.append(refTable)
+            block.type === "block"  && val.insertBefore(searchElement, val.lastChild)
+            block.type === "header" && val.appendChild(searchElement)
+            block.type === "link" && val.append(searchElement)
         } else {
-            if (val.children.namedItem("ref-table")) {
-                val.removeChild(refTable)
+            if (val.children.namedItem("search-ref")) {
+                app.workspace.getLeavesOfType('search-ref').forEach(leaf => {
+                    leaf.detach()
+                })
             }
         }
     })
@@ -251,46 +274,6 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
     count > 0 && val.prepend(countEl)
 }
 
-/**
- * Generate an HTMLTable with links to each references note and the line with the reference
- *
- * @param   {App}              app      
- * @param   {HTMLElement}      val      if the X emoji is clicked the table is removed from this element
- * @param   {Reference[]}      files    An object of files that have the associated reference to the block-id
- *
- * @return  {HTMLTableElement}               
- */
-function createTable({app, val, files}: {app: App, val: HTMLElement | Element, files: Reference[] | Set<unknown> | void}) {
-    const refTable = createEl("table", {cls: "ref-table"})
-    refTable.setAttribute("id", "ref-table")
-
-    const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
-    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
-    const removeTable = createEl("button", {text: "❌" })
-    lineHeaderRow.appendChild(removeTable)
-    removeTable.on("click", "button", () => {val.removeChild(refTable)})
-
-    refTable.appendChild(noteHeaderRow)
-    refTable.appendChild(lineHeaderRow)
-    refTable.appendChild(removeTable)
-
-
-    files && files.forEach(async ( file: Reference ) => {
-        const tFile = app.vault.getAbstractFileByPath(file.path) as TFile
-        const lineContent = await app.vault.cachedRead(tFile).then(content => content.split("\n")[file.pos])
-
-        const row = createEl("tr")
-        const noteCell = createEl("td")
-        const lineCell = createEl("td")
-        noteCell.appendChild(createEl("a", { cls: "internal-link", href: file.path, text: file.basename }))
-        lineCell.appendChild(createEl("span", {text: lineContent}))
-        row.appendChild(noteCell)
-        row.appendChild(lineCell)
-        refTable.appendChild(row)
-    })
-    return refTable
-
-}
 
 /**
  * if there are block reference buttons in the current view, remove them
