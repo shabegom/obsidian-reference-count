@@ -129,7 +129,8 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
                     if (
                         (page.blocks && !hasEmbed && type === "paragraph") ||
                         type === "list" ||
-                        type === "blockquote"
+                        type === "blockquote" ||
+                        type === "code"
                     ) {
                         addBlockReferences({
                             app,
@@ -180,22 +181,30 @@ function addBlockReferences({
 }: AddBlockReferences): void {
     blocks &&
         blocks.forEach((block) => {
-            section.type === "paragraph"
-            block.key === section.id && createButtonElement({ app, block, val })
+            if (block.key === section.id) {
+                if (section.type === "paragraph") {
+                    createButtonElement({ app, block, val })
+                }
+
+                if (section.type === "blockquote" || section.type === "code") {
+                    block.type = "link"
+                    createButtonElement({ app, block, val })
+                }
+            }
+
             // Iterate each list item and add the button to items with block-ids
-            section.type === "list" &&
+
+            if (section.type === "list") {
                 section.items.forEach((item, index: number) => {
                     const buttons = val.querySelectorAll("li")
-                    item.id === block.key &&
+                    if (item.id === block.key) {
                         createButtonElement({
                             app,
                             block,
                             val: buttons[index],
                         })
+                    }
                 })
-            if (section.type === "blockquote" && block.key === section.id) {
-                block.type = "link"
-                createButtonElement({ app, block, val })
             }
         })
 }
@@ -230,9 +239,9 @@ function addLinkReferences({
                             val: embedLink,
                         })
                 })
-            link.reference &&
-                !link.embed &&
+            if (link.reference && !link.embed) {
                 createButtonElement({ app, block: link.reference, val })
+            }
         }
         // Have to iterate list items so the button gets attached to the right element
         if (section.type === "list") {
@@ -240,13 +249,17 @@ function addLinkReferences({
                 const buttons = val.querySelectorAll("li")
                 embedLinks &&
                     embedLinks.forEach((embedLink) => {
-                        link.reference &&
+                        if (
+                            link.reference &&
                             embedLink &&
+                            item.id === link.reference.key
+                        ) {
                             createButtonElement({
                                 app,
                                 block: link.reference,
                                 val: embedLink,
                             })
+                        }
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
@@ -311,38 +324,14 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                query: `file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
+                query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
-        const searchElement = search[search.length - 1].view.containerEl
-        searchElement.setAttribute("data-block-ref-id", block.key)
-        const query = searchElement.querySelector(".search-input-container")
-        const toolbar = searchElement.querySelector(".nav-buttons-container")
-        query.setAttribute("style", "display: none")
-        const closeButton = createEl("button", {
-            cls: "search-input-clear-button",
-        })
-        closeButton.setAttribute(
-            "style",
-            "background: transparent; margin-top: 7px; margin-right: 130px"
-        )
-        closeButton.on("click", "button", () => {
-            app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
-                const container = leaf.view.containerEl
-                const dataKey = `[data-block-ref-id='${block.key}']`
-                const key = container.parentElement.querySelector(dataKey)
-                if (key) {
-                    leaf.detach()
-                }
-            })
-        })
-        toolbar.append(closeButton)
-        searchElement.setAttribute("style", "height: 250px;")
-        searchElement.setAttribute("id", `search-ref`)
+        const searchElement = createSearchElement({ app, search, block })
         if (!val.children.namedItem("search-ref")) {
             search[search.length - 1].view.searchQuery
-            // depending on the type of block the table needs to be inserted into the DOM at different points
+            // depending on the type of block the search view needs to be inserted into the DOM at different points
             block.type === "block" &&
                 val.insertBefore(searchElement, val.lastChild)
             block.type === "header" && val.appendChild(searchElement)
@@ -364,6 +353,35 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         existingButton.remove()
     }
     count > 0 && val.prepend(countEl)
+}
+
+function createSearchElement({ app, search, block }) {
+    const searchElement = search[search.length - 1].view.containerEl
+    searchElement.setAttribute("data-block-ref-id", block.key)
+    const query = searchElement.querySelector(".search-input-container")
+    const toolbar = searchElement.querySelector(".nav-buttons-container")
+    query.setAttribute("style", "display: none")
+    const closeButton = createEl("button", {
+        cls: "search-input-clear-button",
+    })
+    closeButton.setAttribute(
+        "style",
+        "background: transparent; margin-top: 7px; margin-right: 130px"
+    )
+    closeButton.on("click", "button", () => {
+        app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
+            const container = leaf.view.containerEl
+            const dataKey = `[data-block-ref-id='${block.key}']`
+            const key = container.parentElement.querySelector(dataKey)
+            if (key) {
+                leaf.detach()
+            }
+        })
+    })
+    toolbar.append(closeButton)
+    searchElement.setAttribute("style", "height: 250px;")
+    searchElement.setAttribute("id", `search-ref`)
+    return searchElement
 }
 
 /**
