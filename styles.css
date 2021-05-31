@@ -1,4 +1,4 @@
-.count {
+.block-ref-count {
   float: right;
   color: var(--text-muted)
   border: 1px inset var(--text-selection);
@@ -13,22 +13,11 @@
   left: 20px;
 }
 
-.count:hover {
+.block-ref-count:hover {
   color: var(--text-normal);
   border: 1px inset var(--text-accent);
 }
 
-.ref-table {
-  margin-top: 10px;
-  text-align: center;
-}
-
-.ref-table button {
-  background: transparent;
-  position: relative;
-  right: 45px;
-}
-
-.ref-table th {
-  min-width: 150px;
+.highlight-animation {
+  transition: background-color 0.5s ease;
 }
