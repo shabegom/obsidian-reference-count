@@ -1,6 +1,11 @@
-import { App, TFile, BlockCache, LinkCache, EmbedCache, SectionCache, ListItemCache, HeadingCache, Pos } from "obsidian"
+import { App, TFile, BlockCache, LinkCache, EmbedCache, SectionCache, ListItemCache, HeadingCache, Pos, View } from "obsidian"
 
 declare module "obsidian" {
+  interface App {
+    viewRegistry: {
+      getViewCreatorByType: (string) => View
+    }
+  }
   interface View {
     file: TFile
     previewMode: {renderer: {onRendered: (arg0: unknown) => void, sections: { lineStart: number; lineEnd: number; el: HTMLElement; }[]}}

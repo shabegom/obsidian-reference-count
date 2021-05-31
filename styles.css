@@ -1,4 +1,4 @@
-.count {
+.block-ref-count {
   float: right;
   color: var(--text-muted)
   border: 1px inset var(--text-selection);
@@ -13,7 +13,7 @@
   left: 20px;
 }
 
-.count:hover {
+.block-ref-count:hover {
   color: var(--text-normal);
   border: 1px inset var(--text-accent);
 }
