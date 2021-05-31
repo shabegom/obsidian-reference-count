@@ -324,7 +324,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
+                query: `--file:${block.page} --/#(\\\^|\\\s)?//${block.key}/ OR --/${block.page}#(\\\^)?//${block.key}/`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
@@ -379,8 +379,14 @@ function createSearchElement({ app, search, block }) {
         })
     })
     toolbar.append(closeButton)
-    searchElement.setAttribute("style", "height: 250px;")
-    searchElement.setAttribute("id", `search-ref`)
+    searchElement.setAttribute("style", "height: 450px;")
+    searchElement.setAttribute("id", "search-ref")
+    setTimeout(() => {
+        searchElement.querySelectorAll(".search-result-file-matched-text").forEach(result => {
+            result.addClass("highlight-animation")
+            result.removeClass("search-result-file-matched-text") 
+        })
+    }, 2000)
     return searchElement
 }
 
