@@ -128,7 +128,8 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
                     const hasEmbed = embedLinks.length > 0 ? true : false
                     if (
                         (page.blocks && !hasEmbed && type === "paragraph") ||
-                        type === "list"
+                        type === "list" ||
+                        type === "blockquote"
                     ) {
                         addBlockReferences({
                             app,
@@ -179,9 +180,8 @@ function addBlockReferences({
 }: AddBlockReferences): void {
     blocks &&
         blocks.forEach((block) => {
-            section.type === "paragraph" &&
-                block.key === section.id &&
-                createButtonElement({ app, block, val })
+            section.type === "paragraph"
+            block.key === section.id && createButtonElement({ app, block, val })
             // Iterate each list item and add the button to items with block-ids
             section.type === "list" &&
                 section.items.forEach((item, index: number) => {
@@ -193,6 +193,10 @@ function addBlockReferences({
                             val: buttons[index],
                         })
                 })
+            if (section.type === "blockquote" && block.key === section.id) {
+                block.type = "link"
+                createButtonElement({ app, block, val })
+            }
         })
 }
 
