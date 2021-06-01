@@ -25,3 +25,17 @@
   background-color: transparent;
   color: var(--text-muted);
 }
+
+[data-block-ref-id] .search-input-container, [data-block-ref-id] [aria-label="Match case"], [data-block-ref-id] [aria-label="Explain search term"] {
+  display: none;
+}
+
+[data-block-ref-id] .nav-buttons-container .search-input-clear-button {
+  background: transparent;
+  position: relative;
+  padding: 5px 8px 0 8px;
+  margin: 0 3px 10px 3px;
+  top: unset;
+  right: unset;
+  bottom: 5px;
+}

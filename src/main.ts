@@ -6,7 +6,7 @@ import {
     Heading,
     AddLinkReferences,
 } from "./types"
-import { indexBlockReferences, getPages } from "./indexer"
+import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
 import { defaultCipherList } from "constants"
 
 /**
@@ -101,7 +101,8 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
-    const view = leaf ? leaf.view : app.workspace.activeLeaf.view
+    const view = leaf ? leaf.view : app.workspace.activeLeaf ? app.workspace.activeLeaf.view : null
+    if (!view) { return }
     const sourcePath = view.file?.path
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections
@@ -321,12 +322,13 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 
     countEl.on("click", "button", async () => {
         const tempLeaf = app.workspace.getRightLeaf(false)
+        const blockKeyEsc = regexEscape(block.key)
+        const blockPageEsc = regexEscape(block.page)
+        const blockKeyClean = cleanHeader(block.key)
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                //query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
-                query: `((--file:("${block.page}.md") / \\^${block.key}$/) OR (--file:("${block.page}.md") /#\\^${block.key}\]\]/) OR ("^${block.key}" --/\\[\\[${block.page}#\\^${block.key}\\]\\]/)) OR ((--file:("${block.page}.md") (/#+ ${block.key}$/ OR /\\[\\[#${block.key}\\]\\]/)) OR /\\[\\[${block.page}#${block.key}\\]\\]/)`,
-
+                query: `((--file:("${blockPageEsc}.md") / \\^${blockKeyEsc}$/) OR (--file:("${blockPageEsc}.md") /#\\^${blockKeyEsc}\]\]/) OR ("^${blockKeyEsc}" --/\\[\\[${blockPageEsc}#\\^${blockKeyEsc}\\]\\]/)) OR ((--file:("${blockPageEsc}.md") (/#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}\\]\\]/)) OR /\\[\\[${blockPageEsc}#${blockKeyClean}\\]\\]/)`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
@@ -365,16 +367,10 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 function createSearchElement({ app, search, block }) {
     const searchElement = search[search.length - 1].view.containerEl
     searchElement.setAttribute("data-block-ref-id", block.key)
-    const query = searchElement.querySelector(".search-input-container")
     const toolbar = searchElement.querySelector(".nav-buttons-container")
-    query.setAttribute("style", "display: none")
     const closeButton = createEl("button", {
         cls: "search-input-clear-button",
     })
-    closeButton.setAttribute(
-        "style",
-        "background: transparent; margin-top: 7px; margin-right: 130px"
-    )
     closeButton.on("click", "button", () => {
         app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
             const container = leaf.view.containerEl
@@ -402,4 +398,8 @@ function unloadButtons(app: App): void {
     const buttons =
         app.workspace.activeLeaf.containerEl.querySelectorAll("#count")
     buttons && buttons.forEach((button: HTMLElement) => button.remove())
+}
+
+function regexEscape(regexString: string) {
+    return regexString.replace(/(\[|\]|\^|\*)/g, '\\$1')
 }
