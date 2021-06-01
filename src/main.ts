@@ -24,9 +24,11 @@ export default class BlockRefCounter extends Plugin {
     private activeLeafChange: EventRef
     private deleteFile: EventRef
     private resolved: EventRef
+    private layoutLoaded: EventRef
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
+        unloadSearchViews(this.app)
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -79,6 +81,11 @@ export default class BlockRefCounter extends Plugin {
                 createPreviewView({ leaf, app: this.app })
             }
         )
+
+        //This runs only one time at beginning when Obsidian is completely loaded after startup
+        this.layoutLoaded = this.app.workspace.on("layout-ready", () => {
+            unloadSearchViews(this.app)
+        })
     }
 
     onunload(): void {
@@ -86,9 +93,11 @@ export default class BlockRefCounter extends Plugin {
         this.app.metadataCache.offref(this.cacheUpdate)
         this.app.workspace.offref(this.layoutReady)
         this.app.workspace.offref(this.layoutChange)
+        this.app.workspace.offref(this.layoutLoaded)
         this.app.workspace.offref(this.activeLeafChange)
         this.app.workspace.offref(this.deleteFile)
         unloadButtons(this.app)
+        unloadSearchViews(this.app)
     }
 }
 
@@ -328,7 +337,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                query: `((--file:("${blockPageEsc}.md") / \\^${blockKeyEsc}$/) OR (--file:("${blockPageEsc}.md") /#\\^${blockKeyEsc}\]\]/) OR ("^${blockKeyEsc}" --/\\[\\[${blockPageEsc}#\\^${blockKeyEsc}\\]\\]/)) OR ((--file:("${blockPageEsc}.md") (/#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}\\]\\]/)) OR /\\[\\[${blockPageEsc}#${blockKeyClean}\\]\\]/)`,
+                query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
@@ -398,6 +407,12 @@ function unloadButtons(app: App): void {
     const buttons =
         app.workspace.activeLeaf.containerEl.querySelectorAll("#count")
     buttons && buttons.forEach((button: HTMLElement) => button.remove())
+}
+
+function unloadSearchViews(app: App): void {
+    app.workspace
+        .getLeavesOfType('search-ref')
+        .forEach((leaf: WorkspaceLeaf) => leaf.detach())
 }
 
 function regexEscape(regexString: string) {
