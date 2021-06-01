@@ -265,5 +265,5 @@ function isEquivalent(set: Set<Reference>, object: Reference) {
 }
 
 export function cleanHeader(header: string) {
-    return header.replace(/(\[|\]|#|\*)/g, '')
+    return header.replace(/(\[|\]|#|\*)/g, '').replace(/(\|)/g, ' ')
 }
