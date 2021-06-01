@@ -210,7 +210,7 @@ function addBlockReferences({
 }
 
 /**
- * Iterate through links (ncludes transculded embeds) and add a block ref button if the link has an associated block ref
+ * Iterate through links (includes transcluded embeds) and add a block ref button if the link has an associated block ref
  *
  * @param   {App}                     app
  * @param   {HTMLElement}             val        HTMLElement to attach the button to
@@ -324,11 +324,16 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
+                //query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
+                query: `((--file:("${block.page}.md") / \\^${block.key}$/) OR (--file:("${block.page}.md") /#\\^${block.key}\]\]/) OR ("^${block.key}" --/\\[\\[${block.page}#\\^${block.key}\\]\\]/)) OR ((--file:("${block.page}.md") (/#+ ${block.key}$/ OR /\\[\\[#${block.key}\\]\\]/)) OR /\\[\\[${block.page}#${block.key}\\]\\]/)`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
         const searchElement = createSearchElement({ app, search, block })
+        let searchHeight = (count + 1) * 80
+        if (searchHeight < 250) { searchHeight = 250 }
+        if (searchHeight > 600) { searchHeight = 600 }
+        searchElement.setAttribute("style", "height: " + searchHeight + "px;")
         if (!val.children.namedItem("search-ref")) {
             search[search.length - 1].view.searchQuery
             // depending on the type of block the search view needs to be inserted into the DOM at different points

@@ -8,7 +8,7 @@ let pages: Page[] = []
 /**
  * creates a copy of the pages index for use in building block ref buttons
  *
- * @return  {Page[]}  an aray of Page objects
+ * @return  {Page[]}  an array of Page objects
  */
 
 export function getPages(): Page[] {
@@ -48,7 +48,7 @@ export function indexBlockReferences({ app }: { app: App }): void {
  * @param   {BlockCache}       blocks     blocks from metadataCache
  * @param   {SectionCache}     sections   sections from metadataCache
  * @param   {ListItemCache}    listItems  listItems from metadataCache
- * @param   {TFile}            file       current file being processec
+ * @param   {TFile}            file       current file being processed
  *
  * @return  {void}                      
  */
