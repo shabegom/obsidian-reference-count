@@ -342,9 +342,11 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         })
         const search = app.workspace.getLeavesOfType("search-ref")
         const searchElement = createSearchElement({ app, search, block })
-        let searchHeight = (count + 1) * 85
-        if (searchHeight < 300) { searchHeight = 300 }
-        if (searchHeight > 600) { searchHeight = 600 }
+        let searchHeight: number;
+        if (count === 1) { searchHeight = 200 } else if (count === 2) { searchHeight = 250 } else {
+            searchHeight = (count + 1) * 85
+            if (searchHeight < 300) { searchHeight = 300 } else if (searchHeight > 600) { searchHeight = 600 }
+        }
         searchElement.setAttribute("style", "height: " + searchHeight + "px;")
         
         if (!val.children.namedItem("search-ref")) {
