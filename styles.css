@@ -1,6 +1,6 @@
 .block-ref-count {
   float: right;
-  color: var(--text-muted)
+  color: var(--text-muted);
   border: 1px inset var(--text-selection);
   size: .5rem;
   padding: 10px;
