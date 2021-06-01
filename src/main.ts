@@ -331,6 +331,8 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 
     countEl.on("click", "button", async () => {
         const tempLeaf = app.workspace.getRightLeaf(false)
+        //Hide the leaf/pane so it doesn't show up in the right sidebar
+        tempLeaf.tabHeaderEl.hide()
         const blockKeyEsc = regexEscape(block.key)
         const blockPageEsc = regexEscape(block.page)
         const blockKeyClean = cleanHeader(block.key)
