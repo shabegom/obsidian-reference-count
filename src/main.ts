@@ -101,7 +101,8 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
-    const view = leaf ? leaf.view : app.workspace.activeLeaf.view
+    const view = leaf ? leaf.view : app.workspace.activeLeaf ? app.workspace.activeLeaf.view : null
+    if (!view) { return }
     const sourcePath = view.file?.path
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections
