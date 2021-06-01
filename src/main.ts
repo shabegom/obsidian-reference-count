@@ -328,7 +328,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                query: `((--file:("${blockPageEsc}.md") / \\^${blockKeyEsc}$/) OR (--file:("${blockPageEsc}.md") /#\\^${blockKeyEsc}\]\]/) OR ("^${blockKeyEsc}" --/\\[\\[${blockPageEsc}#\\^${blockKeyEsc}\\]\\]/)) OR ((--file:("${blockPageEsc}.md") (/#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}\\]\\]/)) OR /\\[\\[${blockPageEsc}#${blockKeyClean}\\]\\]/)`,
+                query: `((--file:("${blockPageEsc}.md") / \\^${blockKeyEsc}$/) OR (--file:("${blockPageEsc}.md") /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/) OR ("^${blockKeyEsc}" --/\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/)) OR ((--file:("${blockPageEsc}.md") (/#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
