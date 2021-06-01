@@ -148,7 +148,7 @@ function buildObjects({ pages }: { pages: Page[] }) {
 
             })
             page.headings && page.headings.forEach((heading) => {
-                if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
+                if (link.type === "heading" && cleanHeader(link.id) === cleanHeader(heading.key) && link.page === heading.page) {
 
                     const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
                     if (!isEquivalent(heading.references, object)) {
@@ -182,7 +182,13 @@ function buildLinksAndEmbeds({ pages }: { pages: Page[] }) {
     }, [])
     pages.forEach(page => {
         page.items && page.items.forEach(item => {
-            const ref = allRefs.find(ref => ref.key === item.id && ref.page === item.page)
+            const ref = allRefs.find(ref => {
+                if (item.type === "heading") {
+                    if (cleanHeader(ref.key) === cleanHeader(item.id) && ref.page === item.page) { return true } else { return false }
+                } else {
+                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
+                }
+            })
             item.reference = ref && { ...ref, type: "link" }
 
         })
@@ -258,3 +264,6 @@ function isEquivalent(set: Set<Reference>, object: Reference) {
     return equiv
 }
 
+export function cleanHeader(header: string) {
+    return header.replace(/(\[|\]|#|\*)/g, '')
+}

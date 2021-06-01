@@ -6,7 +6,7 @@ import {
     Heading,
     AddLinkReferences,
 } from "./types"
-import { indexBlockReferences, getPages } from "./indexer"
+import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
 import { defaultCipherList } from "constants"
 
 /**
@@ -322,12 +322,13 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 
     countEl.on("click", "button", async () => {
         const tempLeaf = app.workspace.getRightLeaf(false)
+        const blockKeyEsc = regexEscape(block.key)
+        const blockPageEsc = regexEscape(block.page)
+        const blockKeyClean = cleanHeader(block.key)
         await tempLeaf.setViewState({
             type: "search-ref",
             state: {
-                //query: `--file:${block.page} /#(\\\^|\\\s)?${block.key}/ OR /(!)?${block.page}#(\\\^)?${block.key}/`,
-                query: `((--file:("${block.page}.md") / \\^${block.key}$/) OR (--file:("${block.page}.md") /#\\^${block.key}\]\]/) OR ("^${block.key}" --/\\[\\[${block.page}#\\^${block.key}\\]\\]/)) OR ((--file:("${block.page}.md") (/#+ ${block.key}$/ OR /\\[\\[#${block.key}\\]\\]/)) OR /\\[\\[${block.page}#${block.key}\\]\\]/)`,
-
+                query: `((--file:("${blockPageEsc}.md") / \\^${blockKeyEsc}$/) OR (--file:("${blockPageEsc}.md") /#\\^${blockKeyEsc}\]\]/) OR ("^${blockKeyEsc}" --/\\[\\[${blockPageEsc}#\\^${blockKeyEsc}\\]\\]/)) OR ((--file:("${blockPageEsc}.md") (/#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}\\]\\]/)) OR /\\[\\[${blockPageEsc}#${blockKeyClean}\\]\\]/)`,
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
@@ -397,4 +398,8 @@ function unloadButtons(app: App): void {
     const buttons =
         app.workspace.activeLeaf.containerEl.querySelectorAll("#count")
     buttons && buttons.forEach((button: HTMLElement) => button.remove())
+}
+
+function regexEscape(regexString: string) {
+    return regexString.replace(/(\[|\]|\^|\*)/g, '\\$1')
 }
