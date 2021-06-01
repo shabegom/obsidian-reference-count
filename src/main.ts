@@ -365,16 +365,10 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 function createSearchElement({ app, search, block }) {
     const searchElement = search[search.length - 1].view.containerEl
     searchElement.setAttribute("data-block-ref-id", block.key)
-    const query = searchElement.querySelector(".search-input-container")
     const toolbar = searchElement.querySelector(".nav-buttons-container")
-    query.setAttribute("style", "display: none")
     const closeButton = createEl("button", {
         cls: "search-input-clear-button",
     })
-    closeButton.setAttribute(
-        "style",
-        "background: transparent; margin-top: 7px; margin-right: 130px"
-    )
     closeButton.on("click", "button", () => {
         app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
             const container = leaf.view.containerEl
