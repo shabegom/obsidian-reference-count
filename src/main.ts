@@ -331,6 +331,10 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         })
         const search = app.workspace.getLeavesOfType("search-ref")
         const searchElement = createSearchElement({ app, search, block })
+        let searchHeight = (count + 1) * 80
+        if (searchHeight < 250) { searchHeight = 250 }
+        if (searchHeight > 600) { searchHeight = 600 }
+        searchElement.setAttribute("style", "height: " + searchHeight + "px;")
         
         if (!val.children.namedItem("search-ref")) {
             search[search.length - 1].view.searchQuery
@@ -382,13 +386,6 @@ function createSearchElement({ app, search, block }) {
         })
     })
     toolbar.append(closeButton)
-  
-let searchHeight = (count + 1) * 80
-        if (searchHeight < 250) { searchHeight = 250 }
-        if (searchHeight > 600) { searchHeight = 600 }
-        searchElement.setAttribute("style", "height: " + searchHeight + "px;")
-
-    searchElement.setAttribute("style", "height: 450px;")
     searchElement.setAttribute("id", "search-ref")
     return searchElement
 }
