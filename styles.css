@@ -21,3 +21,8 @@
 .highlight-animation {
   transition: background-color 0.5s ease;
 }
+
+.search-result-file-matched-text {
+  background-color: transparent;
+  color: var(--text-muted);
+}

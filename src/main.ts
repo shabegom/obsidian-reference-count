@@ -390,12 +390,6 @@ let searchHeight = (count + 1) * 80
 
     searchElement.setAttribute("style", "height: 450px;")
     searchElement.setAttribute("id", "search-ref")
-    setTimeout(() => {
-        searchElement.querySelectorAll(".search-result-file-matched-text").forEach(result => {
-            result.addClass("highlight-animation")
-            result.removeClass("search-result-file-matched-text") 
-        })
-    }, 2000)
     return searchElement
 }
 
