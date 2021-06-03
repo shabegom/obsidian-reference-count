@@ -28,5 +28,12 @@ If you run into a bug, please submit an issue. If you have any questions reach o
 
 ## Changelog
 
+**0.0.9**
+- Cleanup search view on unload
+- Hide the right sidebar tab
+
+**0.0.8**
+- New references view
+
 **0.0.6**
 - Initial release
