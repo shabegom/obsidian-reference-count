@@ -331,6 +331,8 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
 
     countEl.on("click", "button", async () => {
         const tempLeaf = app.workspace.getRightLeaf(false)
+        //Hide the leaf/pane so it doesn't show up in the right sidebar
+        tempLeaf.tabHeaderEl.hide()
         const blockKeyEsc = regexEscape(block.key)
         const blockPageEsc = regexEscape(block.page)
         const blockKeyClean = cleanHeader(block.key)
@@ -342,9 +344,11 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
         })
         const search = app.workspace.getLeavesOfType("search-ref")
         const searchElement = createSearchElement({ app, search, block })
-        let searchHeight = (count + 1) * 85
-        if (searchHeight < 300) { searchHeight = 300 }
-        if (searchHeight > 600) { searchHeight = 600 }
+        let searchHeight: number;
+        if (count === 1) { searchHeight = 225 } else if (count === 2) { searchHeight = 250 } else {
+            searchHeight = (count + 1) * 85
+            if (searchHeight < 300) { searchHeight = 300 } else if (searchHeight > 600) { searchHeight = 600 }
+        }
         searchElement.setAttribute("style", "height: " + searchHeight + "px;")
         
         if (!val.children.namedItem("search-ref")) {
@@ -416,5 +420,5 @@ function unloadSearchViews(app: App): void {
 }
 
 function regexEscape(regexString: string) {
-    return regexString.replace(/(\[|\]|\^|\*)/g, '\\$1')
+    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, '\\$1')
 }
