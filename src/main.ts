@@ -7,7 +7,6 @@ import {
     AddLinkReferences,
 } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
-import { defaultCipherList } from "constants"
 
 /**
  * BlockRefCounter Plugin
