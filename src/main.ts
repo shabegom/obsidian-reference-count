@@ -420,5 +420,5 @@ function unloadSearchViews(app: App): void {
 }
 
 function regexEscape(regexString: string) {
-    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, '\\$1')
+    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.|\:)/g, '\\$1')
 }
