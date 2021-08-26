@@ -1,4 +1,4 @@
-import { App, EventRef, Plugin, WorkspaceLeaf, View, Events, SearchComponent } from "obsidian"
+import { App, EventRef, Plugin, WorkspaceLeaf, View, Events, MarkdownView } from "obsidian"
 import {
     Block,
     Section,
@@ -20,17 +20,9 @@ import { BlockRefCountSettingTab, BlockRefCountSettings, DEFAULT_SETTINGS } from
 export default class BlockRefCounter extends Plugin {
     settings: BlockRefCountSettings;
 
-    private metaResolvedChange: EventRef
-    private layoutReady: EventRef
-    private layoutChange: EventRef
-    private activeLeafChange: EventRef
-    private cacheUpdateChange: EventRef
-    private deleteFile: EventRef
+
     private resolved: EventRef
-    private layoutLoaded: EventRef
     private indexer = new Events
-    private indexInProgress: EventRef
-    private indexComplete: EventRef
     private indexStatus: string
 
     async onload(): Promise<void> {
@@ -79,56 +71,56 @@ export default class BlockRefCounter extends Plugin {
          * Event listeners to re-index notes if the cache changes or a note is deleted
          * triggers creation of block ref buttons on the preview view
          */
-        this.metaResolvedChange = this.app.metadataCache.on("resolved", () => {
+        this.registerEvent(this.app.metadataCache.on("resolved", () => {
             if (this.indexStatus === "complete") {
                 indexBlockReferences(this.app, this.indexer)
                 createPreviewView(this.app)
             }
-        })
+        }))
 
-        this.deleteFile = this.app.vault.on("delete", () => {
+        this.registerEvent(this.app.vault.on("delete", () => {
             if (this.indexStatus === "complete") {
                 indexBlockReferences(this.app, this.indexer)
             }
             createPreviewView(this.app)
-        })
+        }))
 
         /**
          * Event listeners for layout changes to update the preview view with a block ref count button
          */
 
-        this.layoutChange = this.app.workspace.on("layout-change", () => {
-            this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(
-                () => {
-                    createPreviewView(this.app)
+        this.registerEvent(this.app.workspace.on("layout-change", () => {
+            const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView)
+            if (activeLeaf) {
+                try {
+                    activeLeaf.view.previewMode?.renderer.onRendered(
+                        () => {
+                            createPreviewView(this.app)
+                        }
+                    )
                 }
-            )
-        })
+                catch (err) {
+                    console.warn(err)
+                }
+            }
 
-        this.activeLeafChange = this.app.workspace.on(
+        }))
+
+        this.registerEvent(this.app.workspace.on(
             "active-leaf-change",
             (leaf) => {
                 createPreviewView(this.app, leaf)
             }
-        )
+        ))
 
         //This runs only one time at beginning when Obsidian is completely loaded after startup
-        this.layoutLoaded = this.app.workspace.on("layout-ready", () => {
+        this.registerEvent(this.app.workspace.on("layout-ready", () => {
             unloadSearchViews(this.app)
-        })
+        }))
     }
 
     onunload(): void {
         console.log("unloading plugin: Block Reference Counter")
-        this.app.metadataCache.offref(this.metaResolvedChange)
-        this.app.workspace.offref(this.layoutReady)
-        this.app.workspace.offref(this.layoutChange)
-        this.app.workspace.offref(this.layoutLoaded)
-        this.app.workspace.offref(this.activeLeafChange)
-        this.app.workspace.offref(this.cacheUpdateChange)
-        this.app.workspace.offref(this.deleteFile)
-        this.indexer.offref(this.indexInProgress)
-        this.indexer.offref(this.indexComplete)
         unloadButtons(this.app)
         unloadSearchViews(this.app)
     }
@@ -150,7 +142,18 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
-    const view = leaf ? leaf.view : app.workspace.activeLeaf ? app.workspace.activeLeaf.view : null
+    let view
+    if (leaf) {
+        view = leaf.view
+    } else {
+        const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView)
+        if (activeLeaf) {
+            view = activeLeaf.view
+        } else {
+            view = null
+        }
+
+    }
     if (!view) { return }
     const sourcePath = view.file?.path
     // if previewMode exists and has sections, get the sections
@@ -446,8 +449,11 @@ function createSearchElement(app: App, search: any, block: Block) {
  * @return  {void}
  */
 function unloadButtons(app: App): void {
-    const buttons =
-        app.workspace.activeLeaf.containerEl.querySelectorAll("#count")
+    let buttons
+    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView)
+    if (activeLeaf) {
+        buttons = activeLeaf.containerEl.querySelectorAll("#count")
+    }
     buttons && buttons.forEach((button: HTMLElement) => button.remove())
 }
 

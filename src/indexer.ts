@@ -1,5 +1,5 @@
 
-import { App, BlockCache, EmbedCache, Events, HeadingCache, LinkCache, ListItemCache, SectionCache, TFile } from "obsidian"
+import { App, CachedMetadata, EmbedCache, Events, LinkCache, ListItemCache, SectionCache, TFile, parseLinktext } from "obsidian"
 import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types"
 
 // global index of pages with associated block references
@@ -30,11 +30,11 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
     console.time("indexing")
     pages = []
     const files = app.vault.getMarkdownFiles()
-    let i = 0
-    while (i < files.length) {
-        const { links, embeds, headings, blocks, sections, listItems } = app.metadataCache.getFileCache(files[i])
-        buildPagesArray(embeds, links, headings, blocks, sections, listItems, files[i])
-        i++
+    for (const file of files) {
+        const cache = app.metadataCache.getFileCache(file)
+        if (cache) {
+            buildPagesArray(file, cache)
+        }
     }
     buildObjects(pages)
     buildLinksAndEmbeds(pages)
@@ -56,9 +56,9 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
  *
  * @return  {void}                      
  */
-function buildPagesArray(embeds: EmbedCache[], links: LinkCache[], headings: HeadingCache[], blocks: Record<string, BlockCache>, sections: SectionCache[], listItems: ListItemCache[], file: TFile): void {
-    embeds = embeds ? [...embeds] : []
-    links = links ? [...links] : []
+function buildPagesArray( file: TFile, {embeds, links, headings, blocks, sections, listItems}: CachedMetadata): void {
+    embeds = embeds || []
+    links = links || []
 
 
     const blocksArray = blocks && Object.values(blocks).map((block) => ({
@@ -75,8 +75,8 @@ function buildPagesArray(embeds: EmbedCache[], links: LinkCache[], headings: Hea
         page: file.basename,
         type: "header"
     }))
-    const foundItems = findItems([...embeds, ...links], file )
-    const listSections = createListSections(sections, listItems )
+    const foundItems = findItems([...embeds, ...links], file)
+    const listSections = createListSections(sections, listItems)
 
     if (foundItems) {
         pages.push({
@@ -131,7 +131,7 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
  * @return  {void}             
  */
 
-function buildObjects(pages: Page[] ): void {
+function buildObjects(): void {
     const allLinks = pages.reduce((acc, page) => {
         acc.push(...page.items)
         return acc
@@ -215,7 +215,7 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
         items.forEach((item) => {
             const [note, id] = item.link.split("^")
             const pos = item.position.start.line
-            const page = note.split("#")[0] ? note.split("#")[0] : file.basename
+            const page = parseLinktext(note).path
             const header = item.link.match(/.*#(.*)/)
             const embed = item.original.match(/^!/) ? true : false
             if (id) {
