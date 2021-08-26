@@ -71,7 +71,7 @@ export default class BlockRefCounter extends Plugin {
             }
             timeout = setTimeout(() => {
                 this.typingIndicator = false
-            }, 5000)
+            }, 10000)
         })
 
         /**
@@ -104,7 +104,6 @@ export default class BlockRefCounter extends Plugin {
         this.registerEvent(
             this.app.metadataCache.on("resolved", () => {
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    console.log('indexing due to resolved')
                     indexBlockReferences(this.app, this.indexer)
                 }
                 createPreviewView(this.app, getSettings())
@@ -170,6 +169,7 @@ export default class BlockRefCounter extends Plugin {
         )
 
         this.registerMarkdownPostProcessor((el, ctx) => {
+            createPreviewView(this.app, getSettings())
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
             const start = ctx.getSectionInfo(el).lineStart
@@ -183,7 +183,6 @@ export default class BlockRefCounter extends Plugin {
                     return acc
                 })
             if (page) {
-                console.log("markdownPostProcessor")
                 processPage(page, this.app, el, start)
             }
         })
@@ -255,7 +254,6 @@ function createPreviewView(
         elements &&
             elements.forEach(
                 (section: { el: HTMLElement; lineStart: number }) => {
-                    console.log("createPreviewView")
                     processPage(page, app, section.el, section.lineStart)
                 }
             )
@@ -491,7 +489,7 @@ function createButtonElement(
                 search[search.length - 1].view.searchQuery
                 // depending on the type of block the search view needs to be inserted into the DOM at different points
                 block.type === "block" &&
-                    val.insertBefore(searchElement, val.lastChild)
+                    val.appendChild(searchElement, val.lastChild)
                 block.type === "header" && val.appendChild(searchElement)
                 block.type === "link" && val.append(searchElement)
             } else {
