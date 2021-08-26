@@ -1,4 +1,4 @@
-import { App, EventRef, Plugin, WorkspaceLeaf, View, Events, MarkdownView } from "obsidian"
+import { App, EventRef, Plugin, WorkspaceLeaf, View, Events, MarkdownView, Setting } from "obsidian"
 import {
     Block,
     Section,
@@ -6,7 +6,7 @@ import {
     EmbedOrLinkItem
 } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
-import { BlockRefCountSettingTab, BlockRefCountSettings, DEFAULT_SETTINGS } from "./settings"
+import { BlockRefCountSettingTab, getSettings, updateSettings } from "./settings"
 
 
 /**
@@ -18,31 +18,30 @@ import { BlockRefCountSettingTab, BlockRefCountSettings, DEFAULT_SETTINGS } from
  * When button is clicked, reveals a table with links to each reference and line reference exists on
  */
 export default class BlockRefCounter extends Plugin {
-    settings: BlockRefCountSettings;
-
-
     private resolved: EventRef
     private indexer = new Events
     private indexStatus: string
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
+
         await this.loadSettings()
+
         unloadSearchViews(this.app)
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this))
         /**
          * Setting the indexStatus so we don't overindex
          */
-        this.indexInProgress = this.indexer.on("index-in-progress", () => {
+        this.registerEvent(this.indexer.on("index-in-progress", () => {
             this.indexStatus = "in-progress"
-        })
-        // one minute debounce so we don't index repeatedly on meta changes
-        this.indexComplete = this.indexer.on("index-complete", () => {
+        }))
+        // three second debounce so we don't index repeatedly on meta changes
+        this.registerEvent(this.indexer.on("index-complete", () => {
             setTimeout(() => {
                 this.indexStatus = "complete"
             }, 3000)
-        })
+        }))
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -52,12 +51,12 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 indexBlockReferences(this.app, this.indexer)
-                createPreviewView(this.app)
+                createPreviewView(this.app, getSettings())
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
             indexBlockReferences(this.app, this.indexer)
-            createPreviewView(this.app)
+            createPreviewView(this.app, getSettings())
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -74,7 +73,7 @@ export default class BlockRefCounter extends Plugin {
         this.registerEvent(this.app.metadataCache.on("resolved", () => {
             if (this.indexStatus === "complete") {
                 indexBlockReferences(this.app, this.indexer)
-                createPreviewView(this.app)
+                createPreviewView(this.app, getSettings())
             }
         }))
 
@@ -82,7 +81,7 @@ export default class BlockRefCounter extends Plugin {
             if (this.indexStatus === "complete") {
                 indexBlockReferences(this.app, this.indexer)
             }
-            createPreviewView(this.app)
+            createPreviewView(this.app, getSettings())
         }))
 
         /**
@@ -93,11 +92,15 @@ export default class BlockRefCounter extends Plugin {
             const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView)
             if (activeLeaf) {
                 try {
-                    activeLeaf.view.previewMode?.renderer.onRendered(
-                        () => {
-                            createPreviewView(this.app)
-                        }
-                    )
+                    const view = activeLeaf.view
+                    if (view) {
+                        view.previewMode?.renderer.onRendered(
+                            () => {
+                                createPreviewView(this.app, getSettings())
+                            }
+                        )
+                    }
+                    
                 }
                 catch (err) {
                     console.warn(err)
@@ -109,7 +112,7 @@ export default class BlockRefCounter extends Plugin {
         this.registerEvent(this.app.workspace.on(
             "active-leaf-change",
             (leaf) => {
-                createPreviewView(this.app, leaf)
+                createPreviewView(this.app, getSettings(), leaf)
             }
         ))
 
@@ -125,10 +128,11 @@ export default class BlockRefCounter extends Plugin {
         unloadSearchViews(this.app)
     }
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+        const newSettings = await this.loadData()
+        updateSettings(newSettings)
     }
     async saveSettings() {
-        await this.saveData(this.settings)
+        await this.saveData(getSettings())
     }
 
 }
@@ -139,9 +143,10 @@ export default class BlockRefCounter extends Plugin {
  *
  * @param   {WorkspaceLeaf}         leaf  if leaf is passed, use that to get the view
  * @param   {App}                   app
+ * @param {BlockRefCountSettings}   settings the plugin settings
  * @return  {void}
  */
-function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
+function createPreviewView(app: App, settings: BlockRefCountSettings, leaf?: WorkspaceLeaf): void {
     let view
     if (leaf) {
         view = leaf.view
@@ -179,7 +184,7 @@ function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
                     const embedLinks =
                         section.el.querySelectorAll(".markdown-embed")
                     const hasEmbed = embedLinks.length > 0 ? true : false
-                    if (
+                    if ( settings.displayParent &&
                         (page.blocks && !hasEmbed && type === "paragraph") ||
                         type === "list" ||
                         type === "blockquote" ||
@@ -192,7 +197,7 @@ function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
                             pageSection,
                         )
                     }
-                    if (page.headings && type === "heading") {
+                    if (settings.displayParent && page.headings && type === "heading") {
                         addHeaderReferences(
                             app,
                             section.el,
@@ -201,7 +206,7 @@ function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
                         )
                     }
 
-                    if (page.items) {
+                    if (settings.displayChild && page.items) {
                         addLinkReferences(
                             app,
                             section.el,

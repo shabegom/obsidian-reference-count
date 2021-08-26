@@ -1,4 +1,4 @@
-import { App, Setting, PluginSettingTab } from "obsidian"
+import { App, Setting, PluginSettingTab, } from "obsidian"
 import BlockRefCounter from "./main"
 
 export interface BlockRefCountSettings {
@@ -11,6 +11,18 @@ export const DEFAULT_SETTINGS: BlockRefCountSettings = {
     displayParent: true,
     displayChild: true,
     tableType: "search"
+}
+
+let settings: BlockRefCountSettings = { ...DEFAULT_SETTINGS }
+
+export const getSettings = (): BlockRefCountSettings => {
+    return { ...settings }
+}
+
+export const updateSettings = (newSettings: Partial<BlockRefCountSettings>): BlockRefCountSettings => {
+    settings = { ...settings, ...newSettings }
+
+    return getSettings()
 }
 
 export class BlockRefCountSettingTab extends PluginSettingTab {
@@ -32,8 +44,9 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .setName("Display on Parents")
             .setDesc("Display the count of block references on the parent block or header")
             .addToggle((toggle) => {
+                toggle.setValue(getSettings().displayParent)
                 toggle.onChange(async (val) => {
-                    this.plugin.settings.displayParent = val
+                    updateSettings({displayParent: val})
                     await this.plugin.saveSettings()
                 })
             })
@@ -41,8 +54,9 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .setName("Display on Children")
             .setDesc("Display the count of block references on the child reference blocks")
             .addToggle((toggle) => {
+                toggle.setValue(getSettings().displayChild)
                 toggle.onChange(async (val) => {
-                    this.plugin.settings.displayChild = val
+                    updateSettings({displayChild: val})
                     await this.plugin.saveSettings()
                 })
             })
@@ -50,10 +64,11 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .setName("Type of Reference Table")
             .setDesc("Choose what type of table you'd like references displayed as.")
             .addDropdown((dropdown) => {
+                dropdown.setValue(getSettings().tableType)
                 dropdown.addOption("search", "Search Results Table")
                 dropdown.addOption("basic", "Basic Table")
                 dropdown.onChange(async (val) => {
-                    this.plugin.settings.tableType = val
+                    updateSettings({tableType: val})
                     await this.plugin.saveSettings()
                 })
             })
