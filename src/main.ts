@@ -31,6 +31,7 @@ export default class BlockRefCounter extends Plugin {
     private resolved: EventRef
     private indexer = new Events()
     private indexStatus: string
+    private typingIndicator: boolean
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
@@ -62,6 +63,17 @@ export default class BlockRefCounter extends Plugin {
             })
         )
 
+        this.registerDomEvent(document, "keyup", () => {
+            let timeout
+            this.typingIndicator = true
+            if (timeout) {
+                clearTimeout(timeout)
+            }
+            timeout = setTimeout(() => {
+                this.typingIndicator = false
+            }, 5000)
+        })
+
         /**
          * Fire the initial indexing only if layoutReady = true
          * and if the metadataCache has been resolved for the first time
@@ -91,7 +103,8 @@ export default class BlockRefCounter extends Plugin {
          */
         this.registerEvent(
             this.app.metadataCache.on("resolved", () => {
-                if (this.indexStatus === "complete") {
+                if (this.indexStatus === "complete" && !this.typingIndicator) {
+                    console.log('indexing due to resolved')
                     indexBlockReferences(this.app, this.indexer)
                 }
                 createPreviewView(this.app, getSettings())
