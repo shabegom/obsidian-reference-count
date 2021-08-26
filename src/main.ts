@@ -1,4 +1,4 @@
-import { App, EventRef, Plugin, WorkspaceLeaf, View } from "obsidian"
+import { App, EventRef, Plugin, WorkspaceLeaf, View, Events } from "obsidian"
 import {
     AddBlockReferences,
     CreateButtonElement,
@@ -7,7 +7,7 @@ import {
     AddLinkReferences,
 } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
-import { defaultCipherList } from "constants"
+
 
 /**
  * BlockRefCounter Plugin
@@ -25,11 +25,26 @@ export default class BlockRefCounter extends Plugin {
     private deleteFile: EventRef
     private resolved: EventRef
     private layoutLoaded: EventRef
+    private indexer = new Events
+    private indexInProgress: EventRef
+    private indexComplete: EventRef
+    private indexStatus: string
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
-        console.log('testing hot reload')
         unloadSearchViews(this.app)
+
+        /**
+         * Setting the indexStatus so we don't overindex
+         */
+        this.indexInProgress = this.indexer.on("index-in-progress", () => {
+            this.indexStatus = "in-progress"
+            console.log(this.indexStatus)
+        })
+        this.indexComplete = this.indexer.on("index-complete", () => {
+            this.indexStatus = "complete"
+            console.log(this.indexStatus)
+        })
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -38,12 +53,12 @@ export default class BlockRefCounter extends Plugin {
          */
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
-                indexBlockReferences({ app: this.app })
+                indexBlockReferences(this.app, this.indexer)
                 createPreviewView({ app: this.app })
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
-            indexBlockReferences({ app: this.app })
+            indexBlockReferences(this.app, this.indexer)
             createPreviewView({ app: this.app })
         }
 
@@ -59,12 +74,11 @@ export default class BlockRefCounter extends Plugin {
          * triggers creation of block ref buttons on the preview view
          */
         this.cacheUpdate = this.app.metadataCache.on("changed", () => {
-            indexBlockReferences({ app: this.app })
             createPreviewView({ app: this.app })
         })
 
         this.deleteFile = this.app.vault.on("delete", () => {
-            indexBlockReferences({ app: this.app })
+            indexBlockReferences(this.app, this.indexer)
             createPreviewView({ app: this.app })
         })
 
@@ -97,6 +111,8 @@ export default class BlockRefCounter extends Plugin {
         this.app.workspace.offref(this.layoutLoaded)
         this.app.workspace.offref(this.activeLeafChange)
         this.app.workspace.offref(this.deleteFile)
+        this.indexer.offref(this.indexInProgress)
+        this.indexer.offref(this.indexComplete)
         unloadButtons(this.app)
         unloadSearchViews(this.app)
     }
@@ -351,7 +367,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
             if (searchHeight < 300) { searchHeight = 300 } else if (searchHeight > 600) { searchHeight = 600 }
         }
         searchElement.setAttribute("style", "height: " + searchHeight + "px;")
-        
+
         if (!val.children.namedItem("search-ref")) {
             search[search.length - 1].view.searchQuery
             // depending on the type of block the search view needs to be inserted into the DOM at different points
@@ -416,10 +432,10 @@ function unloadButtons(app: App): void {
 
 function unloadSearchViews(app: App): void {
     app.workspace
-        .getLeavesOfType('search-ref')
+        .getLeavesOfType("search-ref")
         .forEach((leaf: WorkspaceLeaf) => leaf.detach())
 }
 
 function regexEscape(regexString: string) {
-    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, '\\$1')
+    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, "\\$1")
 }

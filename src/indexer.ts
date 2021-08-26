@@ -1,5 +1,5 @@
 
-import { App, BlockCache, EmbedCache, HeadingCache, LinkCache, ListItemCache, SectionCache } from "obsidian"
+import { App, Events } from "obsidian"
 import { Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems, Reference } from "./types"
 
 /* global index of pages with associated block references */
@@ -25,7 +25,8 @@ export function getPages(): Page[] {
  * @return  {void}
  */
 
-export function indexBlockReferences({ app }: { app: App }): void {
+export function indexBlockReferences(app: App, indexerEvent: Events): void {
+    indexerEvent.trigger('index-in-progress')
     pages = []
     const files = app.vault.getMarkdownFiles()
     let i = 0
@@ -36,6 +37,7 @@ export function indexBlockReferences({ app }: { app: App }): void {
     }
     buildObjects({ pages })
     buildLinksAndEmbeds({ pages })
+    indexerEvent.trigger('index-complete')
 }
 
 

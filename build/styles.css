@@ -39,3 +39,8 @@
   right: unset;
   bottom: 5px;
 }
+
+
+.is-mobile .block-ref-count {
+  width: unset
+}
