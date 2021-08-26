@@ -28,6 +28,7 @@ export default class BlockRefCounter extends Plugin {
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
+        console.log('testing hot reload')
         unloadSearchViews(this.app)
 
         /**
