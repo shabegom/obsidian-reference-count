@@ -26,7 +26,8 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App, indexerEvent: Events): void {
-    indexerEvent.trigger('index-in-progress')
+    indexerEvent.trigger("index-in-progress")
+    console.time("indexing")
     pages = []
     const files = app.vault.getMarkdownFiles()
     let i = 0
@@ -37,7 +38,8 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
     }
     buildObjects({ pages })
     buildLinksAndEmbeds({ pages })
-    indexerEvent.trigger('index-complete')
+    indexerEvent.trigger("index-complete")
+    console.timeEnd("indexing")
 }
 
 
@@ -267,5 +269,5 @@ function isEquivalent(set: Set<Reference>, object: Reference) {
 }
 
 export function cleanHeader(header: string) {
-    return header.replace(/(\[|\]|#|\*|\(|\))/g, '').replace(/(\||\.)/g, ' ')
+    return header.replace(/(\[|\]|#|\*|\(|\))/g, "").replace(/(\||\.)/g, " ")
 }

@@ -1,10 +1,9 @@
-import { App, EventRef, Plugin, WorkspaceLeaf, View, Events } from "obsidian"
+import { App, EventRef, Plugin, WorkspaceLeaf, View, Events, SearchComponent } from "obsidian"
 import {
-    AddBlockReferences,
-    CreateButtonElement,
-    AddHeaderReferences,
+    Block,
+    Section,
     Heading,
-    AddLinkReferences,
+    EmbedOrLinkItem
 } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
 
@@ -18,10 +17,11 @@ import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
  * When button is clicked, reveals a table with links to each reference and line reference exists on
  */
 export default class BlockRefCounter extends Plugin {
-    private cacheUpdate: EventRef
+    private metaResolvedChange: EventRef
     private layoutReady: EventRef
     private layoutChange: EventRef
     private activeLeafChange: EventRef
+    private cacheUpdateChange: EventRef
     private deleteFile: EventRef
     private resolved: EventRef
     private layoutLoaded: EventRef
@@ -39,11 +39,12 @@ export default class BlockRefCounter extends Plugin {
          */
         this.indexInProgress = this.indexer.on("index-in-progress", () => {
             this.indexStatus = "in-progress"
-            console.log(this.indexStatus)
         })
+        // one minute debounce so we don't index repeatedly on meta changes
         this.indexComplete = this.indexer.on("index-complete", () => {
-            this.indexStatus = "complete"
-            console.log(this.indexStatus)
+            setTimeout(() => {
+                this.indexStatus = "complete"
+            }, 60000)
         })
 
         /**
@@ -54,12 +55,12 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 indexBlockReferences(this.app, this.indexer)
-                createPreviewView({ app: this.app })
+                createPreviewView(this.app )
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
             indexBlockReferences(this.app, this.indexer)
-            createPreviewView({ app: this.app })
+            createPreviewView(this.app)
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -73,19 +74,28 @@ export default class BlockRefCounter extends Plugin {
          * Event listeners to re-index notes if the cache changes or a note is deleted
          * triggers creation of block ref buttons on the preview view
          */
-        this.cacheUpdate = this.app.metadataCache.on("changed", () => {
-            createPreviewView({ app: this.app })
+        this.metaResolvedChange = this.app.metadataCache.on("resolved", () => {
+            if (this.indexStatus === "complete") {
+                indexBlockReferences(this.app, this.indexer)
+                createPreviewView(this.app)
+            }    
         })
 
         this.deleteFile = this.app.vault.on("delete", () => {
-            indexBlockReferences(this.app, this.indexer)
-            createPreviewView({ app: this.app })
+            if (this.indexStatus === "complete") {
+                indexBlockReferences(this.app, this.indexer)
+            }
+            createPreviewView(this.app)
         })
+
+        /**
+         * Event listeners for layout changes to update the preview view with a block ref count button
+         */
 
         this.layoutChange = this.app.workspace.on("layout-change", () => {
             this.app.workspace.activeLeaf.view.previewMode?.renderer.onRendered(
                 () => {
-                    createPreviewView({ app: this.app })
+                    createPreviewView(this.app)
                 }
             )
         })
@@ -93,7 +103,7 @@ export default class BlockRefCounter extends Plugin {
         this.activeLeafChange = this.app.workspace.on(
             "active-leaf-change",
             (leaf) => {
-                createPreviewView({ leaf, app: this.app })
+                createPreviewView(this.app, leaf)
             }
         )
 
@@ -105,11 +115,12 @@ export default class BlockRefCounter extends Plugin {
 
     onunload(): void {
         console.log("unloading plugin: Block Reference Counter")
-        this.app.metadataCache.offref(this.cacheUpdate)
+        this.app.metadataCache.offref(this.metaResolvedChange)
         this.app.workspace.offref(this.layoutReady)
         this.app.workspace.offref(this.layoutChange)
         this.app.workspace.offref(this.layoutLoaded)
         this.app.workspace.offref(this.activeLeafChange)
+        this.app.workspace.offref(this.cacheUpdateChange)
         this.app.workspace.offref(this.deleteFile)
         this.indexer.offref(this.indexInProgress)
         this.indexer.offref(this.indexComplete)
@@ -126,7 +137,7 @@ export default class BlockRefCounter extends Plugin {
  * @param   {App}                   app
  * @return  {void}
  */
-function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
+function createPreviewView(app: App, leaf?: WorkspaceLeaf): void {
     const view = leaf ? leaf.view : app.workspace.activeLeaf ? app.workspace.activeLeaf.view : null
     if (!view) { return }
     const sourcePath = view.file?.path
@@ -159,30 +170,30 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
                         type === "blockquote" ||
                         type === "code"
                     ) {
-                        addBlockReferences({
+                        addBlockReferences(
                             app,
-                            val: section.el,
-                            blocks: page.blocks,
-                            section: pageSection,
-                        })
+                            section.el,
+                            page.blocks,
+                            pageSection,
+                        )
                     }
                     if (page.headings && type === "heading") {
-                        addHeaderReferences({
+                        addHeaderReferences(
                             app,
-                            val: section.el,
-                            headings: page.headings,
-                            section: pageSection,
-                        })
+                            section.el,
+                            page.headings,
+                            pageSection,
+                        )
                     }
 
                     if (page.items) {
-                        addLinkReferences({
+                        addLinkReferences(
                             app,
-                            val: section.el,
-                            links: page.items,
-                            section: pageSection,
-                            embedLinks,
-                        })
+                            section.el,
+                            page.items,
+                            pageSection,
+                            embedLinks as NodeListOf<HTMLElement>,
+                        )
                     }
                 }
             })
@@ -200,22 +211,21 @@ function createPreviewView({ leaf, app }: { leaf?: WorkspaceLeaf; app: App }) {
  *
  * @return  {void}
  */
-function addBlockReferences({
-    app,
-    val,
-    blocks,
-    section,
-}: AddBlockReferences): void {
+function addBlockReferences(
+    app: App,
+    val: HTMLElement,
+    blocks: Block[],
+    section: Section): void {
     blocks &&
         blocks.forEach((block) => {
             if (block.key === section.id) {
                 if (section.type === "paragraph") {
-                    createButtonElement({ app, block, val })
+                    createButtonElement( app, block, val )
                 }
 
                 if (section.type === "blockquote" || section.type === "code") {
                     block.type = "link"
-                    createButtonElement({ app, block, val })
+                    createButtonElement(app, block, val )
                 }
             }
 
@@ -225,11 +235,11 @@ function addBlockReferences({
                 section.items.forEach((item, index: number) => {
                     const buttons = val.querySelectorAll("li")
                     if (item.id === block.key) {
-                        createButtonElement({
+                        createButtonElement(
                             app,
                             block,
-                            val: buttons[index],
-                        })
+                            buttons[index],
+                        )
                     }
                 })
             }
@@ -247,27 +257,27 @@ function addBlockReferences({
  *
  * @return  {void}
  */
-function addLinkReferences({
-    app,
-    val,
-    links,
-    section,
-    embedLinks,
-}: AddLinkReferences) {
+function addLinkReferences(
+    app: App,
+    val: HTMLElement,
+    links: EmbedOrLinkItem[],
+    section: Section,
+    embedLinks: NodeListOf<HTMLElement>,
+): void {
     links.forEach((link) => {
         if (section.type === "paragraph" && section.pos === link.pos) {
             embedLinks &&
                 embedLinks.forEach((embedLink) => {
                     link.reference &&
                         embedLink &&
-                        createButtonElement({
+                        createButtonElement(
                             app,
-                            block: link.reference,
-                            val: embedLink,
-                        })
+                            link.reference,
+                            embedLink,
+                        )
                 })
             if (link.reference && !link.embed) {
-                createButtonElement({ app, block: link.reference, val })
+                createButtonElement( app, link.reference, val )
             }
         }
         // Have to iterate list items so the button gets attached to the right element
@@ -281,22 +291,22 @@ function addLinkReferences({
                             embedLink &&
                             item.id === link.reference.key
                         ) {
-                            createButtonElement({
+                            createButtonElement(
                                 app,
-                                block: link.reference,
-                                val: embedLink,
-                            })
+                                link.reference,
+                                embedLink,
+                            )
                         }
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
 
                     link.reference.type = "block"
-                    createButtonElement({
+                    createButtonElement(
                         app,
-                        block: link.reference,
-                        val: buttons[index],
-                    })
+                        link.reference,
+                        buttons[index],
+                    )
                 }
             })
         }
@@ -314,16 +324,15 @@ function addLinkReferences({
  * @return  {void}
  */
 
-function addHeaderReferences({
-    app,
-    val,
-    headings,
-    section,
-}: AddHeaderReferences) {
+function addHeaderReferences(
+    app: App,
+    val: HTMLElement,
+    headings: Heading[],
+    section: Section,): void {
     if (headings) {
         headings.forEach((header: Heading) => {
             header.pos === section.pos &&
-                createButtonElement({ app, block: header, val })
+                createButtonElement(app, header, val )
         })
     }
 }
@@ -337,7 +346,7 @@ function addHeaderReferences({
  *
  * @return  {void}
  */
-function createButtonElement({ app, block, val }: CreateButtonElement): void {
+function createButtonElement(app: App, block: Block | Heading, val: HTMLElement): void {
     const count = block && block.references ? block.references.size : 0
 
     const existingButton = val.querySelector("#count")
@@ -360,8 +369,8 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
-        const searchElement = createSearchElement({ app, search, block })
-        let searchHeight: number;
+        const searchElement = createSearchElement(app, search, block )
+        let searchHeight: number
         if (count === 1) { searchHeight = 225 } else if (count === 2) { searchHeight = 250 } else {
             searchHeight = (count + 1) * 85
             if (searchHeight < 300) { searchHeight = 300 } else if (searchHeight > 600) { searchHeight = 600 }
@@ -394,7 +403,7 @@ function createButtonElement({ app, block, val }: CreateButtonElement): void {
     count > 0 && val.prepend(countEl)
 }
 
-function createSearchElement({ app, search, block }) {
+function createSearchElement(app: App, search: any, block: Block ) {
     const searchElement = search[search.length - 1].view.containerEl
     searchElement.setAttribute("data-block-ref-id", block.key)
     const toolbar = searchElement.querySelector(".nav-buttons-container")
