@@ -17,7 +17,7 @@ import {
     updateSettings,
 } from "./settings"
 
-const viewTracker = new Events()
+
 
 /**
  * BlockRefCounter Plugin
@@ -31,7 +31,6 @@ export default class BlockRefCounter extends Plugin {
     private resolved: EventRef
     private indexer = new Events()
     private indexStatus: string
-    private viewStatus: string
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
@@ -49,7 +48,7 @@ export default class BlockRefCounter extends Plugin {
                 this.indexStatus = "in-progress"
             })
         )
-        // thirty second debounce so we don't index repeatedly on meta changes
+        // ten second debounce so we don't index repeatedly on meta changes
         this.registerEvent(
             this.indexer.on("index-complete", () => {
                 let timeout
@@ -58,21 +57,10 @@ export default class BlockRefCounter extends Plugin {
                 }
                 timeout = setTimeout(() => {
                     this.indexStatus = "complete"
-                }, 30000)
+                }, 10000)
+                
             })
         )
-
-        /**
-         * debouncing the creation of views so we don't do too much work
-        */
-
-        this.registerEvent(viewTracker.on('creating view', () => {
-            this.viewStatus = 'creating'
-        }))
-
-        this.registerEvent(viewTracker.on('view created', () => {
-            this.viewStatus = 'created'
-        }))
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -105,8 +93,8 @@ export default class BlockRefCounter extends Plugin {
             this.app.metadataCache.on("resolved", () => {
                 if (this.indexStatus === "complete") {
                     indexBlockReferences(this.app, this.indexer)
-                    createPreviewView(this.app, getSettings())
                 }
+                createPreviewView(this.app, getSettings())
             })
         )
 
@@ -114,8 +102,9 @@ export default class BlockRefCounter extends Plugin {
             this.app.vault.on("delete", () => {
                 if (this.indexStatus === "complete") {
                     indexBlockReferences(this.app, this.indexer)
-                    createPreviewView(this.app, getSettings())
+                    
                 }
+                createPreviewView(this.app, getSettings())
             })
         )
 
@@ -125,7 +114,7 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                createPreviewView(this.app, getSettings())
+               
                 const activeLeaf =
                     this.app.workspace.getActiveViewOfType(MarkdownView)
                 if (activeLeaf) {
@@ -137,6 +126,7 @@ export default class BlockRefCounter extends Plugin {
                                     indexBlockReferences(this.app, this.indexer)
                                 }
                                 
+                                createPreviewView(this.app, getSettings())
                             })
                         }
                     } catch (err) {
@@ -167,8 +157,6 @@ export default class BlockRefCounter extends Plugin {
         )
 
         this.registerMarkdownPostProcessor((el, ctx) => {
-
-            createPreviewView(this.app, getSettings())
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
             const start = ctx.getSectionInfo(el).lineStart
@@ -184,9 +172,6 @@ export default class BlockRefCounter extends Plugin {
             if (page) {
                 console.log("markdownPostProcessor")
                 processPage(page, this.app, el, start)
-            }
-            if (this.indexStatus === "complete") {
-                indexBlockReferences(this.app, this.indexer)
             }
         })
 
@@ -226,7 +211,6 @@ function createPreviewView(
     settings: BlockRefCountSettings,
     leaf?: WorkspaceLeaf
 ): void {
-    viewTracker.trigger('creating view')
     let view
     if (leaf) {
         view = leaf.view
@@ -263,7 +247,6 @@ function createPreviewView(
                 }
             )
     }
-    viewTracker.trigger('view created')
 }
 
 function processPage(
