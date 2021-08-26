@@ -35,6 +35,7 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
         if (cache) {
             buildPagesArray(file, cache)
         }
+
     }
     buildObjects(pages)
     buildLinksAndEmbeds(pages)
@@ -56,11 +57,8 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
  *
  * @return  {void}                      
  */
-function buildPagesArray( file: TFile, {embeds, links, headings, blocks, sections, listItems}: CachedMetadata): void {
-    embeds = embeds || []
-    links = links || []
-
-
+function buildPagesArray( file: TFile, cache: CachedMetadata): void {
+    const {embeds = [], links = [], headings, blocks, sections, listItems} = cache
     const blocksArray = blocks && Object.values(blocks).map((block) => ({
         key: block.id,
         pos: block.position.start.line,
@@ -84,10 +82,10 @@ function buildPagesArray( file: TFile, {embeds, links, headings, blocks, section
             headings: headingsArray,
             blocks: blocksArray,
             file,
-            sections: listSections
+            sections: listSections,
+            cache
         })
     }
-
 }
 
 
@@ -102,6 +100,7 @@ function buildPagesArray( file: TFile, {embeds, links, headings, blocks, section
  */
 
 function createListSections(sections: SectionCache[], listItems: ListItemCache[]): Section[] {
+
     if (listItems) {
         return sections.map((section) => {
             const items: ListItem[] = []
@@ -117,6 +116,7 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
             return section
         })
     }
+  
     return sections
 }
 
@@ -210,6 +210,7 @@ function buildLinksAndEmbeds(pages: Page[]): void {
  */
 
 function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkItem[] {
+
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
         items.forEach((item) => {
@@ -245,6 +246,7 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
             }
         })
     }
+
     return foundItems
 
 }
