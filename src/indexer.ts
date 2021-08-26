@@ -1,8 +1,8 @@
 
-import { App, Events } from "obsidian"
-import { Page, EmbedOrLinkItem, BuildPagesArray, CreateListSections, Section, ListItem, FindItems, Reference } from "./types"
+import { App, BlockCache, EmbedCache, Events, HeadingCache, LinkCache, ListItemCache, SectionCache, TFile } from "obsidian"
+import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types"
 
-/* global index of pages with associated block references */
+// global index of pages with associated block references
 let pages: Page[] = []
 
 /**
@@ -33,11 +33,11 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
     let i = 0
     while (i < files.length) {
         const { links, embeds, headings, blocks, sections, listItems } = app.metadataCache.getFileCache(files[i])
-        buildPagesArray({ embeds, links, headings, blocks, sections, listItems, file: files[i] })
+        buildPagesArray(embeds, links, headings, blocks, sections, listItems, files[i])
         i++
     }
-    buildObjects({ pages })
-    buildLinksAndEmbeds({ pages })
+    buildObjects(pages)
+    buildLinksAndEmbeds(pages)
     indexerEvent.trigger("index-complete")
     console.timeEnd("indexing")
 }
@@ -46,17 +46,17 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
 /**
  * takes in metadataCache items and associated file and pushes the initial page object into the pages array
  *
- * @param   {EmbedCache}       embeds     embeds from metadataCache
- * @param   {LinkCache}        links      links from metadataCache
- * @param   {HeadingCache}     headings   headings from metadataCache
- * @param   {BlockCache}       blocks     blocks from metadataCache
- * @param   {SectionCache}     sections   sections from metadataCache
- * @param   {ListItemCache}    listItems  listItems from metadataCache
+ * @param   {EmbedCache[]}       embeds     embeds from metadataCache
+ * @param   {LinkCache[]}        links      links from metadataCache
+ * @param   {HeadingCache[]}     headings   headings from metadataCache
+ * @param   {Record<string,BlockCache>}       blocks     blocks from metadataCache
+ * @param   {SectionCache[]}     sections   sections from metadataCache
+ * @param   {ListItemCache[]}    listItems  listItems from metadataCache
  * @param   {TFile}            file       current file being processed
  *
  * @return  {void}                      
  */
-function buildPagesArray({ embeds, links, headings, blocks, sections, listItems, file }: BuildPagesArray): void {
+function buildPagesArray(embeds: EmbedCache[], links: LinkCache[], headings: HeadingCache[], blocks: Record<string, BlockCache>, sections: SectionCache[], listItems: ListItemCache[], file: TFile): void {
     embeds = embeds ? [...embeds] : []
     links = links ? [...links] : []
 
@@ -68,15 +68,15 @@ function buildPagesArray({ embeds, links, headings, blocks, sections, listItems,
         type: "block"
     }))
 
-    const headingsArray = headings && headings.map(header => ({
+    const headingsArray = headings && headings.map((header: { heading: any; position: { start: { line: any } } }) => ({
         key: header.heading,
         pos: header.position.start.line,
 
         page: file.basename,
         type: "header"
     }))
-    const foundItems = findItems({ items: [...embeds, ...links], file })
-    const listSections = createListSections({ sections, listItems })
+    const foundItems = findItems([...embeds, ...links], file )
+    const listSections = createListSections(sections, listItems )
 
     if (foundItems) {
         pages.push({
@@ -95,18 +95,18 @@ function buildPagesArray({ embeds, links, headings, blocks, sections, listItems,
  * If the section is of type list, add the list items from the metadataCache to the section object. 
  * This makes it easier to iterate a list when building block ref buttons
  *
- * @param   {SectionCache}                sections  
- * @param   {ListItemCache}               listItems  
+ * @param   {SectionCache[]}                sections  
+ * @param   {ListItemCache[]}               listItems  
  *
  * @return  {Section[]}                        Array of sections with additional items key
  */
 
-function createListSections({ sections, listItems }: CreateListSections): Section[] {
+function createListSections(sections: SectionCache[], listItems: ListItemCache[]): Section[] {
     if (listItems) {
-        return sections.map(section => {
+        return sections.map((section) => {
             const items: ListItem[] = []
             if (section.type === "list") {
-                listItems.forEach((item) => {
+                listItems.forEach((item: ListItem) => {
                     if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
                         items.push({ pos: item.position.start.line, ...item })
                     }
@@ -131,7 +131,7 @@ function createListSections({ sections, listItems }: CreateListSections): Sectio
  * @return  {void}             
  */
 
-function buildObjects({ pages }: { pages: Page[] }) {
+function buildObjects(pages: Page[] ): void {
     const allLinks = pages.reduce((acc, page) => {
         acc.push(...page.items)
         return acc
@@ -178,7 +178,7 @@ function buildObjects({ pages }: { pages: Page[] }) {
  * @return  {void}             
  */
 
-function buildLinksAndEmbeds({ pages }: { pages: Page[] }) {
+function buildLinksAndEmbeds(pages: Page[]): void {
     const allRefs = pages.reduce((acc, page) => {
         page.blocks && acc.push(...page.blocks)
         page.headings && acc.push(...page.headings)
@@ -203,16 +203,16 @@ function buildLinksAndEmbeds({ pages }: { pages: Page[] }) {
 /**
  * Creates an array of block-id links and embeds that exist in the vault
  *
- * @param   {EmbedCache & LinkCache[]}     items  Array of embeds and links
+ * @param   {EmbedCache[] & LinkCache[]}     items  Array of embeds and links
  * @param   {TFile}  file   
  *
- * @return  {[type]}            [return description]
+ * @return  {EmbedOrLinkItem[]}            
  */
 
-function findItems({ items, file }: FindItems) {
+function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkItem[] {
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
-        items.forEach(item => {
+        items.forEach((item) => {
             const [note, id] = item.link.split("^")
             const pos = item.position.start.line
             const page = note.split("#")[0] ? note.split("#")[0] : file.basename
@@ -258,7 +258,7 @@ function findItems({ items, file }: FindItems) {
  *
  * @return  {boolean}             true if object exists in Set
  */
-function isEquivalent(set: Set<Reference>, object: Reference) {
+function isEquivalent(set: Set<Reference>, object: Reference): boolean {
     let equiv = false
     set && set.forEach((setObject) => {
         if (setObject.pos === object.pos && setObject.path === object.path) {
@@ -268,6 +268,6 @@ function isEquivalent(set: Set<Reference>, object: Reference) {
     return equiv
 }
 
-export function cleanHeader(header: string) {
+export function cleanHeader(header: string): string {
     return header.replace(/(\[|\]|#|\*|\(|\))/g, "").replace(/(\||\.)/g, " ")
 }

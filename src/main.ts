@@ -6,6 +6,7 @@ import {
     EmbedOrLinkItem
 } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
+import { BlockRefCountSettingTab, BlockRefCountSettings, DEFAULT_SETTINGS } from "./settings"
 
 
 /**
@@ -17,6 +18,8 @@ import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
  * When button is clicked, reveals a table with links to each reference and line reference exists on
  */
 export default class BlockRefCounter extends Plugin {
+    settings: BlockRefCountSettings;
+
     private metaResolvedChange: EventRef
     private layoutReady: EventRef
     private layoutChange: EventRef
@@ -32,8 +35,10 @@ export default class BlockRefCounter extends Plugin {
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
+        await this.loadSettings()
         unloadSearchViews(this.app)
 
+        this.addSettingTab(new BlockRefCountSettingTab(this.app, this))
         /**
          * Setting the indexStatus so we don't overindex
          */
@@ -44,7 +49,7 @@ export default class BlockRefCounter extends Plugin {
         this.indexComplete = this.indexer.on("index-complete", () => {
             setTimeout(() => {
                 this.indexStatus = "complete"
-            }, 60000)
+            }, 3000)
         })
 
         /**
@@ -55,7 +60,7 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 indexBlockReferences(this.app, this.indexer)
-                createPreviewView(this.app )
+                createPreviewView(this.app)
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
@@ -78,7 +83,7 @@ export default class BlockRefCounter extends Plugin {
             if (this.indexStatus === "complete") {
                 indexBlockReferences(this.app, this.indexer)
                 createPreviewView(this.app)
-            }    
+            }
         })
 
         this.deleteFile = this.app.vault.on("delete", () => {
@@ -127,6 +132,13 @@ export default class BlockRefCounter extends Plugin {
         unloadButtons(this.app)
         unloadSearchViews(this.app)
     }
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    }
+    async saveSettings() {
+        await this.saveData(this.settings)
+    }
+
 }
 
 /**
@@ -220,12 +232,12 @@ function addBlockReferences(
         blocks.forEach((block) => {
             if (block.key === section.id) {
                 if (section.type === "paragraph") {
-                    createButtonElement( app, block, val )
+                    createButtonElement(app, block, val)
                 }
 
                 if (section.type === "blockquote" || section.type === "code") {
                     block.type = "link"
-                    createButtonElement(app, block, val )
+                    createButtonElement(app, block, val)
                 }
             }
 
@@ -277,7 +289,7 @@ function addLinkReferences(
                         )
                 })
             if (link.reference && !link.embed) {
-                createButtonElement( app, link.reference, val )
+                createButtonElement(app, link.reference, val)
             }
         }
         // Have to iterate list items so the button gets attached to the right element
@@ -332,7 +344,7 @@ function addHeaderReferences(
     if (headings) {
         headings.forEach((header: Heading) => {
             header.pos === section.pos &&
-                createButtonElement(app, header, val )
+                createButtonElement(app, header, val)
         })
     }
 }
@@ -369,7 +381,7 @@ function createButtonElement(app: App, block: Block | Heading, val: HTMLElement)
             },
         })
         const search = app.workspace.getLeavesOfType("search-ref")
-        const searchElement = createSearchElement(app, search, block )
+        const searchElement = createSearchElement(app, search, block)
         let searchHeight: number
         if (count === 1) { searchHeight = 225 } else if (count === 2) { searchHeight = 250 } else {
             searchHeight = (count + 1) * 85
@@ -403,7 +415,7 @@ function createButtonElement(app: App, block: Block | Heading, val: HTMLElement)
     count > 0 && val.prepend(countEl)
 }
 
-function createSearchElement(app: App, search: any, block: Block ) {
+function createSearchElement(app: App, search: any, block: Block) {
     const searchElement = search[search.length - 1].view.containerEl
     searchElement.setAttribute("data-block-ref-id", block.key)
     const toolbar = searchElement.querySelector(".nav-buttons-container")
