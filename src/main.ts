@@ -70,8 +70,8 @@ export default class BlockRefCounter extends Plugin {
             typingDebounce()
         })
 
-        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer), 500)
-        const previewDebounce = debounce(() => createPreviewView(this.app), 100, true)
+        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer), 10000)
+        const previewDebounce = debounce(() => createPreviewView(this.app), 1000, true)
 
 
         /**
@@ -81,12 +81,12 @@ export default class BlockRefCounter extends Plugin {
          */
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
-                indexDebounce()
+                indexBlockReferences(this.app, this.indexer)
                 previewDebounce()
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
-            indexDebounce()
+            indexBlockReferences(this.app, this.indexer)
             previewDebounce()
         }
 
@@ -237,13 +237,12 @@ function processPage(
                 const type = pageSection?.type
 
                 // find embeds because their section.type is paragraph but they need to be processed differently
-                const markdownEmbedLinks = el.querySelectorAll(".markdown-embed")
-                const hasMdEmbed = markdownEmbedLinks.length > 0 ? true : false
-                const embeds = hasMdEmbed ? Array.from(markdownEmbedLinks) : undefined
+                const embeds = el.querySelectorAll(".internal-embed")
+                const hasEmbed = embeds.length > 0 ? true : false
                 if (
                     (settings.displayParent &&
                     page.blocks &&
-                    !embeds &&
+                    !hasEmbed &&
                     type === "paragraph") ||
                 type === "list" ||
                 type === "blockquote" ||
@@ -328,7 +327,7 @@ function addLinkReferences(
     val: HTMLElement,
     links: EmbedOrLinkItem[],
     section: Section,
-    embedLinks: Element[]
+    embedLinks: NodeListOf<Element>
 ): void {
     links.forEach((link) => {
         if (section.type === "paragraph" && section.pos === link.pos) {
@@ -336,7 +335,10 @@ function addLinkReferences(
                 embedLinks.forEach((embedLink) => {
                     link.reference &&
                         embedLink &&
-                        createButtonElement(app, link.reference, embedLink as HTMLElement)
+                        // need to delay a bit until the embed is loaded into the view
+                        setTimeout(() => {
+                            createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement)
+                        }, 10)
                 })
             if (link.reference && !link.embed) {
                 createButtonElement(app, link.reference, val)
@@ -353,7 +355,9 @@ function addLinkReferences(
                             embedLink &&
                             item.id === link.reference.key
                         ) {
-                            createButtonElement(app, link.reference, embedLink as HTMLElement)
+                            setTimeout(() => {
+                                createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement)
+                            }, 10)
                         }
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
