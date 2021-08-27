@@ -364,8 +364,7 @@ function addLinkReferences(
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
-
-                    link.reference.type = "block"
+                    
                     createButtonElement(app, link.reference, buttons[index])
                 }
             })
@@ -417,6 +416,11 @@ function createButtonElement(
         const countEl = createEl("button", { cls: "block-ref-count" })
         countEl.setAttribute("data-block-ref-id", block.key)
         countEl.setAttribute("id", "count")
+        if (block.type === "link") {
+            countEl.addClass("child-ref")
+        } else {
+            countEl.addClass("parent-ref")
+        }
         countEl.innerText = count.toString()
         const {tableType} = getSettings()
 
@@ -425,7 +429,7 @@ function createButtonElement(
             const refTable: HTMLElement = createTable(app, val, refs)
             countEl.on("click", "button", () => {
                 if (!val.children.namedItem("ref-table")) {
-                    block.type === "block"  && val.insertBefore(refTable, val.lastChild)
+                    block.type === "block"  && val.appendChild(refTable)
                     block.type === "header" && val.appendChild(refTable)
                     block.type === "link" && val.append(refTable)
                 } else {
