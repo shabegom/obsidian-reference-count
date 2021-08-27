@@ -49,30 +49,28 @@ export default class BlockRefCounter extends Plugin {
                 this.indexStatus = "in-progress"
             })
         )
-        // ten second debounce so we don't index repeatedly on meta changes
+
+        // three second debounce so we don't index repeatedly on meta changes
+        const completionDebounce = debounce(() => {
+            this.indexStatus = "complete"
+        }, 3000)
         this.registerEvent(
             this.indexer.on("index-complete", () => {
-                let timeout
-                if (timeout) {
-                    clearTimeout(timeout)
-                }
-                timeout = setTimeout(() => {
-                    this.indexStatus = "complete"
-                }, 10000)
-                
+                completionDebounce()
             })
         )
 
+        const typingDebounce = debounce(() => {
+            this.typingIndicator = false
+        }, 1000)
         this.registerDomEvent(document, "keyup", () => {
-            let timeout
             this.typingIndicator = true
-            if (timeout) {
-                clearTimeout(timeout)
-            }
-            timeout = setTimeout(() => {
-                this.typingIndicator = false
-            }, 10000)
+            typingDebounce()
         })
+
+        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer), 500)
+        const previewDebounce = debounce(() => createPreviewView(this.app), 100, true)
+
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -81,13 +79,13 @@ export default class BlockRefCounter extends Plugin {
          */
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
-                indexBlockReferences(this.app, this.indexer)
-                createPreviewView(this.app, getSettings())
+                indexDebounce()
+                previewDebounce()
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
-            indexBlockReferences(this.app, this.indexer)
-            createPreviewView(this.app, getSettings())
+            indexDebounce()
+            previewDebounce()
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -104,19 +102,17 @@ export default class BlockRefCounter extends Plugin {
         this.registerEvent(
             this.app.metadataCache.on("resolved", () => {
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexBlockReferences(this.app, this.indexer)
+                    indexDebounce()
                 }
-                createPreviewView(this.app, getSettings())
+                previewDebounce()
             })
         )
 
         this.registerEvent(
             this.app.vault.on("delete", () => {
-                if (this.indexStatus === "complete") {
-                    indexBlockReferences(this.app, this.indexer)
-                    
+                if (this.indexStatus === "complete" && !this.typingIndicator) {
+                    indexDebounce()
                 }
-                createPreviewView(this.app, getSettings())
             })
         )
 
@@ -126,65 +122,41 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-               
-                const activeLeaf =
-                    this.app.workspace.getActiveViewOfType(MarkdownView)
-                if (activeLeaf) {
-                    try {
-                        const view = activeLeaf.view
-                        if (view) {
-                            view.previewMode?.renderer.onRendered(() => {
-                                if (this.indexStatus === "complete") {
-                                    indexBlockReferences(this.app, this.indexer)
-                                }
-                                
-                                createPreviewView(this.app, getSettings())
-                            })
-                        }
-                    } catch (err) {
-                        console.warn(err)
-                    }
+                previewDebounce()
+                if (this.indexStatus === "complete" && !this.typingIndicator) {
+                    indexDebounce()
                 }
             })
         )
 
         this.registerEvent(
-            this.app.workspace.on("active-leaf-change", (leaf) => {
-                createPreviewView(this.app, getSettings(), leaf)
-                if (this.indexStatus === "complete") {
-                    indexBlockReferences(this.app, this.indexer)
+            this.app.workspace.on("active-leaf-change", () => {
+                previewDebounce()
+                if (this.indexStatus === "complete" && !this.typingIndicator) {
+                    indexDebounce()
                 }
-                
             })
         )
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-                createPreviewView(this.app, getSettings())
-                if (this.indexStatus === "complete") {
-                    indexBlockReferences(this.app, this.indexer)
+                previewDebounce()
+                if (this.indexStatus === "complete" && !this.typingIndicator) {
+                    indexDebounce()
                 }
-                
+
             })
         )
 
         this.registerMarkdownPostProcessor((el, ctx) => {
-            createPreviewView(this.app, getSettings())
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
             const start = ctx.getSectionInfo(el).lineStart
-            const pages = getPages()
-            const page =
-                pages[0] &&
-                getPages().reduce((acc, page) => {
-                    if (page.file.path === path) {
-                        acc = page
-                    }
-                    return acc
-                })
+            const page = getPage(path)
             if (page) {
                 processPage(page, this.app, el, start)
             }
+            previewDebounce()
         })
 
         //This runs only one time at beginning when Obsidian is completely loaded after startup
@@ -220,19 +192,13 @@ export default class BlockRefCounter extends Plugin {
  */
 function createPreviewView(
     app: App,
-    settings: BlockRefCountSettings,
-    leaf?: WorkspaceLeaf
 ): void {
     let view
-    if (leaf) {
-        view = leaf.view
+    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView)
+    if (activeLeaf) {
+        view = activeLeaf.view
     } else {
-        const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView)
-        if (activeLeaf) {
-            view = activeLeaf.view
-        } else {
-            view = null
-        }
+        view = null
     }
     if (!view) {
         return
@@ -240,23 +206,13 @@ function createPreviewView(
     const sourcePath = view.file?.path
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections
-    const pages = getPages()
-    const page =
-        pages[0] &&
-        getPages().reduce((acc, page) => {
-            if (page.file.path === sourcePath) {
-                acc = page
+    const page = getPage(sourcePath)
+    if (page && elements) {
+        elements.forEach(
+            (section: { el: HTMLElement; lineStart: number }) => {
+                processPage(page, app, section.el, section.lineStart)
             }
-            return acc
-        })
-
-    if (page) {
-        elements &&
-            elements.forEach(
-                (section: { el: HTMLElement; lineStart: number }) => {
-                    processPage(page, app, section.el, section.lineStart)
-                }
-            )
+        )
     }
 }
 
@@ -276,13 +232,15 @@ function processPage(
         if (pageSection.position.start.line === start) {
             pageSection.pos = pageSection.position.start.line
             const type = pageSection?.type
+
             // find embeds because their section.type is paragraph but they need to be processed differently
-            const embedLinks = el.querySelectorAll(".markdown-embed")
-            const hasEmbed = embedLinks.length > 0 ? true : false
+            const markdownEmbedLinks = el.querySelectorAll(".markdown-embed")
+            const hasMdEmbed = markdownEmbedLinks.length > 0 ? true : false
+            const embeds = hasMdEmbed ? Array.from(markdownEmbedLinks) : undefined
             if (
                 (settings.displayParent &&
                     page.blocks &&
-                    !hasEmbed &&
+                    !embeds &&
                     type === "paragraph") ||
                 type === "list" ||
                 type === "blockquote" ||
@@ -300,7 +258,7 @@ function processPage(
                     el,
                     page.items,
                     pageSection,
-                    embedLinks as NodeListOf<HTMLElement>
+                    embeds
                 )
             }
         }
@@ -366,7 +324,7 @@ function addLinkReferences(
     val: HTMLElement,
     links: EmbedOrLinkItem[],
     section: Section,
-    embedLinks: NodeListOf<HTMLElement>
+    embedLinks: Element[]
 ): void {
     links.forEach((link) => {
         if (section.type === "paragraph" && section.pos === link.pos) {
@@ -374,7 +332,7 @@ function addLinkReferences(
                 embedLinks.forEach((embedLink) => {
                     link.reference &&
                         embedLink &&
-                        createButtonElement(app, link.reference, embedLink)
+                        createButtonElement(app, link.reference, embedLink as HTMLElement)
                 })
             if (link.reference && !link.embed) {
                 createButtonElement(app, link.reference, val)
@@ -489,7 +447,7 @@ function createButtonElement(
                 search[search.length - 1].view.searchQuery
                 // depending on the type of block the search view needs to be inserted into the DOM at different points
                 block.type === "block" &&
-                    val.appendChild(searchElement, val.lastChild)
+                    val.appendChild(searchElement)
                 block.type === "header" && val.appendChild(searchElement)
                 block.type === "link" && val.append(searchElement)
             } else {
@@ -562,4 +520,37 @@ function unloadSearchViews(app: App): void {
 
 function regexEscape(regexString: string) {
     return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, "\\$1")
+}
+
+// Returns a function, that, as long as it continues to be invoked, will not
+// be triggered. The function will be called after it stops being called for
+// N milliseconds. If `immediate` is passed, trigger the function on the
+// leading edge, instead of the trailing.
+// from: https://davidwalsh.name/javascript-debounce-function
+function debounce(func: () => void, wait: number, immediate?: boolean) {
+    let timeout: ReturnType<typeof setTimeout>
+    return function (...args: any) {
+        const later = function () {
+            timeout = null
+            if (!immediate) func.apply(this, ...args)
+        }
+        const callNow = immediate && !timeout
+        clearTimeout(timeout)
+        timeout = setTimeout(later, wait)
+        if (callNow) func.apply(this, ...args)
+    }
+}
+
+//utility function to fetch a specific page from the index
+function getPage(sourcePath: string) {
+    const pages = getPages()
+
+    return pages[0] &&
+        getPages().reduce((acc, page) => {
+            if (page.file.path === sourcePath) {
+                acc = page
+            }
+            return acc
+        })
+
 }
