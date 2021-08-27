@@ -65,11 +65,14 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .setDesc("Choose what type of table you'd like references displayed as.")
             .addDropdown((dropdown) => {
                 dropdown.setValue(getSettings().tableType)
+                dropdown.addOption("choose", "Choose a Table Type")
                 dropdown.addOption("search", "Search Results Table")
                 dropdown.addOption("basic", "Basic Table")
                 dropdown.onChange(async (val) => {
-                    updateSettings({tableType: val})
-                    await this.plugin.saveSettings()
+                    if (val === "search" || val === "basic") {
+                        updateSettings({tableType: val})
+                        await this.plugin.saveSettings()
+                    }
                 })
             })
     }
