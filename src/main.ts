@@ -9,10 +9,9 @@ import {
     TFile,
     Notice,
 } from "obsidian"
-import { Block, Section, Heading, EmbedOrLinkItem } from "./types"
+import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
 import {
-    BlockRefCountSettings,
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
@@ -418,66 +417,83 @@ function createButtonElement(
         countEl.innerText = count.toString()
         const {tableType} = getSettings()
 
-        countEl.on("click", "button", async () => {
-            const searchEnabled = app.internalPlugins.getPluginById("global-search").enabled
-            if (!searchEnabled) {new Notice("you need to enable the core search plugin")}
-            if (tableType === "search" && searchEnabled) {
-                const tempLeaf = app.workspace.getRightLeaf(false)
-                //Hide the leaf/pane so it doesn't show up in the right sidebar
-                tempLeaf.tabHeaderEl.hide()
-                const blockKeyEsc = regexEscape(block.key)
-                const blockPageEsc = regexEscape(block.page)
-                const blockKeyClean = cleanHeader(block.key)
-                await tempLeaf.setViewState({
-                    type: "search-ref",
-                    state: {
-                        query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
-                    },
-                })
-                const search = app.workspace.getLeavesOfType("search-ref")
-                const searchElement = createSearchElement(app, search, block)
-                let searchHeight: number
-                if (count === 1) {
-                    searchHeight = 225
-                } else if (count === 2) {
-                    searchHeight = 250
+        if (tableType === "basic") {
+            const refs = block.references ? Array.from(block.references) : undefined
+            const refTable: HTMLElement = createTable(app, val, refs)
+            countEl.on("click", "button", () => {
+                if (!val.children.namedItem("ref-table")) {
+                    block.type === "block"  && val.insertBefore(refTable, val.lastChild)
+                    block.type === "header" && val.appendChild(refTable)
+                    block.type === "link" && val.append(refTable)
                 } else {
-                    searchHeight = (count + 1) * 85
-                    if (searchHeight < 300) {
-                        searchHeight = 300
-                    } else if (searchHeight > 600) {
-                        searchHeight = 600
+                    if (val.children.namedItem("ref-table")) {
+                        val.removeChild(refTable)
                     }
                 }
-                searchElement.setAttribute(
-                    "style",
-                    "height: " + searchHeight + "px;"
-                )
+            })
+        }
+        if (tableType === "search") {
+            countEl.on("click", "button", async () => {
+                const searchEnabled = app.internalPlugins.getPluginById("global-search").enabled
+                if (!searchEnabled) {new Notice("you need to enable the core search plugin")
+                } else {
+                    const tempLeaf = app.workspace.getRightLeaf(false)
+                    //Hide the leaf/pane so it doesn't show up in the right sidebar
+                    tempLeaf.tabHeaderEl.hide()
+                    const blockKeyEsc = regexEscape(block.key)
+                    const blockPageEsc = regexEscape(block.page)
+                    const blockKeyClean = cleanHeader(block.key)
+                    await tempLeaf.setViewState({
+                        type: "search-ref",
+                        state: {
+                            query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
+                        },
+                    })
+                    const search = app.workspace.getLeavesOfType("search-ref")
+                    const searchElement = createSearchElement(app, search, block)
+                    let searchHeight: number
+                    if (count === 1) {
+                        searchHeight = 225
+                    } else if (count === 2) {
+                        searchHeight = 250
+                    } else {
+                        searchHeight = (count + 1) * 85
+                        if (searchHeight < 300) {
+                            searchHeight = 300
+                        } else if (searchHeight > 600) {
+                            searchHeight = 600
+                        }
+                    }
+                    searchElement.setAttribute(
+                        "style",
+                        "height: " + searchHeight + "px;"
+                    )
 
-                if (!val.children.namedItem("search-ref")) {
-                    search[search.length - 1].view.searchQuery
-                    // depending on the type of block the search view needs to be inserted into the DOM at different points
-                    block.type === "block" &&
+                    if (!val.children.namedItem("search-ref")) {
+                        search[search.length - 1].view.searchQuery
+                        // depending on the type of block the search view needs to be inserted into the DOM at different points
+                        block.type === "block" &&
                     val.appendChild(searchElement)
-                    block.type === "header" && val.appendChild(searchElement)
-                    block.type === "link" && val.append(searchElement)
-                } else {
-                    if (val.children.namedItem("search-ref")) {
-                        app.workspace
-                            .getLeavesOfType("search-ref")
-                            .forEach((leaf) => {
-                                const container = leaf.view.containerEl
-                                const dataKey = `[data-block-ref-id='${block.key}']`
-                                const key =
+                        block.type === "header" && val.appendChild(searchElement)
+                        block.type === "link" && val.append(searchElement)
+                    } else {
+                        if (val.children.namedItem("search-ref")) {
+                            app.workspace
+                                .getLeavesOfType("search-ref")
+                                .forEach((leaf) => {
+                                    const container = leaf.view.containerEl
+                                    const dataKey = `[data-block-ref-id='${block.key}']`
+                                    const key =
                                 container.parentElement.querySelector(dataKey)
-                                if (key) {
-                                    leaf.detach()
-                                }
-                            })
+                                    if (key) {
+                                        leaf.detach()
+                                    }
+                                })
+                        }
                     }
                 }
-            }
-        })
+            })
+        }
         if (existingButton) {
             existingButton.remove()
         }
@@ -506,6 +522,35 @@ function createSearchElement(app: App, search: any, block: Block) {
     searchElement.setAttribute("id", "search-ref")
     return searchElement
 }
+
+
+function createTable(app: App, val: HTMLElement, refs: Reference[]): HTMLElement {
+    const refTable = createEl("table", {cls: "ref-table"})
+    refTable.setAttribute("id", "ref-table")
+    const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
+    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
+    const removeTable = createEl("button", {text: "❌" })
+    lineHeaderRow.appendChild(removeTable)
+    removeTable.on("click", "button", () => {val.removeChild(refTable)})
+    refTable.appendChild(noteHeaderRow)
+    refTable.appendChild(lineHeaderRow)
+    refTable.appendChild(removeTable)
+    refs && refs.forEach(async ( ref ) => {
+        const file = await app.vault.getAbstractFileByPath(ref.path) as TFile
+        const lineContent = await app.vault.cachedRead(file).then(content => content.split("\n")[ref.pos])
+        const row = createEl("tr")
+        const noteCell = createEl("td")
+        const lineCell = createEl("td")
+        noteCell.appendChild(createEl("a", { cls: "internal-link", href: ref.path, text: ref.basename }))
+        lineCell.appendChild(createEl("span", {text: lineContent}))
+        row.appendChild(noteCell)
+        row.appendChild(lineCell)
+        refTable.appendChild(row)
+    })
+    return refTable
+
+}
+
 
 /**
  * if there are block reference buttons in the current view, remove them
