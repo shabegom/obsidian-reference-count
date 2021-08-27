@@ -56,7 +56,7 @@ export default class BlockRefCounter extends Plugin {
         // three second debounce so we don't index repeatedly on meta changes
         const completionDebounce = debounce(() => {
             this.indexStatus = "complete"
-        }, 3000)
+        }, 1000)
         this.registerEvent(
             this.indexer.on("index-complete", () => {
                 completionDebounce()
@@ -65,15 +65,15 @@ export default class BlockRefCounter extends Plugin {
 
         const typingDebounce = debounce(() => {
             this.typingIndicator = false
-        }, 1000)
+        }, 500)
         this.registerDomEvent(document, "keyup", () => {
             this.typingIndicator = true
             typingDebounce()
         })
 
-        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer), 10000)
+        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer, true), 5000)
         this.indexDebounce = indexDebounce
-        const previewDebounce = debounce(() => createPreviewView(this.app), 1000, true)
+        const previewDebounce = debounce(() => createPreviewView(this.app), 500, true)
         this.previewDebounce = previewDebounce
 
         /**
@@ -158,10 +158,10 @@ export default class BlockRefCounter extends Plugin {
         this.registerMarkdownPostProcessor((el, ctx) => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
-            const start = ctx.getSectionInfo(el).lineStart
+            const {lineStart} = ctx.getSectionInfo(el)
             const page = getPage(path)
             if (page) {
-                processPage(page, this.app, el, start)
+                processPage(page, this.app, el, lineStart)
             }
             previewDebounce()
         })
@@ -340,7 +340,7 @@ function addLinkReferences(
                         // need to delay a bit until the embed is loaded into the view
                         setTimeout(() => {
                             createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement)
-                        }, 10)
+                        }, 1)
                 })
             if (link.reference && !link.embed) {
                 createButtonElement(app, link.reference, val)
@@ -359,7 +359,7 @@ function addLinkReferences(
                         ) {
                             setTimeout(() => {
                                 createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement)
-                            }, 10)
+                            }, 1)
                         }
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
@@ -536,7 +536,8 @@ function createTable(app: App, val: HTMLElement, refs: Reference[]): HTMLElement
     refTable.setAttribute("id", "ref-table")
     const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
     const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
-    const removeTable = createEl("button", {text: "❌" })
+    const removeTable = createEl("button", {text: "x" })
+    removeTable.addClass("table-close")
     lineHeaderRow.appendChild(removeTable)
     removeTable.on("click", "button", () => {val.removeChild(refTable)})
     refTable.appendChild(noteHeaderRow)

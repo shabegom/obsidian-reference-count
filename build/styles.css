@@ -44,3 +44,7 @@
 .is-mobile .block-ref-count {
   width: unset
 }
+
+.table-close {
+  color: var(--text-muted);
+}
