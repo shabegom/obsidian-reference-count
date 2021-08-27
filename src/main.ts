@@ -32,6 +32,8 @@ export default class BlockRefCounter extends Plugin {
     private indexer = new Events()
     private indexStatus: string
     private typingIndicator: boolean
+    public previewDebounce: () => void
+    public indexDebounce: () => void
 
 
     async onload(): Promise<void> {
@@ -70,8 +72,9 @@ export default class BlockRefCounter extends Plugin {
         })
 
         const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer), 10000)
+        this.indexDebounce = indexDebounce
         const previewDebounce = debounce(() => createPreviewView(this.app), 1000, true)
-
+        this.previewDebounce = previewDebounce
 
         /**
          * Fire the initial indexing only if layoutReady = true
