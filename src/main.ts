@@ -230,41 +230,43 @@ function processPage(
     start: number
 ) {
     const settings = getSettings()
-    page.sections.forEach((pageSection: Section) => {
-        if (pageSection.position.start.line === start) {
-            pageSection.pos = pageSection.position.start.line
-            const type = pageSection?.type
+    if (page.sections) {
+        page.sections.forEach((pageSection: Section) => {
+            if (pageSection.position.start.line === start) {
+                pageSection.pos = pageSection.position.start.line
+                const type = pageSection?.type
 
-            // find embeds because their section.type is paragraph but they need to be processed differently
-            const markdownEmbedLinks = el.querySelectorAll(".markdown-embed")
-            const hasMdEmbed = markdownEmbedLinks.length > 0 ? true : false
-            const embeds = hasMdEmbed ? Array.from(markdownEmbedLinks) : undefined
-            if (
-                (settings.displayParent &&
+                // find embeds because their section.type is paragraph but they need to be processed differently
+                const markdownEmbedLinks = el.querySelectorAll(".markdown-embed")
+                const hasMdEmbed = markdownEmbedLinks.length > 0 ? true : false
+                const embeds = hasMdEmbed ? Array.from(markdownEmbedLinks) : undefined
+                if (
+                    (settings.displayParent &&
                     page.blocks &&
                     !embeds &&
                     type === "paragraph") ||
                 type === "list" ||
                 type === "blockquote" ||
                 type === "code"
-            ) {
-                addBlockReferences(app, el, page.blocks, pageSection)
-            }
-            if (settings.displayParent && page.headings && type === "heading") {
-                addHeaderReferences(app, el, page.headings, pageSection)
-            }
+                ) {
+                    addBlockReferences(app, el, page.blocks, pageSection)
+                }
+                if (settings.displayParent && page.headings && type === "heading") {
+                    addHeaderReferences(app, el, page.headings, pageSection)
+                }
 
-            if (settings.displayChild && page.items) {
-                addLinkReferences(
-                    app,
-                    el,
-                    page.items,
-                    pageSection,
-                    embeds
-                )
+                if (settings.displayChild && page.items) {
+                    addLinkReferences(
+                        app,
+                        el,
+                        page.items,
+                        pageSection,
+                        embeds
+                    )
+                }
             }
-        }
-    })
+        })
+    }
 }
 
 /**
