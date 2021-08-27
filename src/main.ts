@@ -7,6 +7,7 @@ import {
     Events,
     MarkdownView,
     TFile,
+    Notice,
 } from "obsidian"
 import { Block, Section, Heading, EmbedOrLinkItem } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
@@ -32,6 +33,7 @@ export default class BlockRefCounter extends Plugin {
     private indexer = new Events()
     private indexStatus: string
     private typingIndicator: boolean
+
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter")
@@ -89,6 +91,9 @@ export default class BlockRefCounter extends Plugin {
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
+            if (!this.app.viewRegistry.getViewCreatorByType("search")) {
+                return
+            }
             const newView: View =
                 this.app.viewRegistry.getViewCreatorByType("search")(leaf)
             newView.getViewType = () => "search-ref"
@@ -184,10 +189,7 @@ export default class BlockRefCounter extends Plugin {
 /**
  * Finds the sections present in a note's Preview, iterates them and adds references if required
  * This duplicates some of the functionality of onMarkdownPostProcessor, but is fired on layout and leaf changes
- *
- * @param   {WorkspaceLeaf}         leaf  if leaf is passed, use that to get the view
  * @param   {App}                   app
- * @param {BlockRefCountSettings}   settings the plugin settings
  * @return  {void}
  */
 function createPreviewView(
@@ -349,7 +351,7 @@ function addLinkReferences(
                             embedLink &&
                             item.id === link.reference.key
                         ) {
-                            createButtonElement(app, link.reference, embedLink)
+                            createButtonElement(app, link.reference, embedLink as HTMLElement)
                         }
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
@@ -397,72 +399,76 @@ function addHeaderReferences(
  * @return  {void}
  */
 function createButtonElement(
-    app: App,
+    app:  App,
     block: Block | Heading,
     val: HTMLElement
 ): void {
     if (val) {
         const count = block && block.references ? block.references.size : 0
-
         const existingButton = val.querySelector("#count")
         const countEl = createEl("button", { cls: "block-ref-count" })
         countEl.setAttribute("data-block-ref-id", block.key)
         countEl.setAttribute("id", "count")
         countEl.innerText = count.toString()
+        const {tableType} = getSettings()
 
         countEl.on("click", "button", async () => {
-            const tempLeaf = app.workspace.getRightLeaf(false)
-            //Hide the leaf/pane so it doesn't show up in the right sidebar
-            tempLeaf.tabHeaderEl.hide()
-            const blockKeyEsc = regexEscape(block.key)
-            const blockPageEsc = regexEscape(block.page)
-            const blockKeyClean = cleanHeader(block.key)
-            await tempLeaf.setViewState({
-                type: "search-ref",
-                state: {
-                    query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
-                },
-            })
-            const search = app.workspace.getLeavesOfType("search-ref")
-            const searchElement = createSearchElement(app, search, block)
-            let searchHeight: number
-            if (count === 1) {
-                searchHeight = 225
-            } else if (count === 2) {
-                searchHeight = 250
-            } else {
-                searchHeight = (count + 1) * 85
-                if (searchHeight < 300) {
-                    searchHeight = 300
-                } else if (searchHeight > 600) {
-                    searchHeight = 600
+            const searchEnabled = app.internalPlugins.getPluginById("global-search").enabled
+            if (!searchEnabled) {new Notice("you need to enable the core search plugin")}
+            if (tableType === "search" && searchEnabled) {
+                const tempLeaf = app.workspace.getRightLeaf(false)
+                //Hide the leaf/pane so it doesn't show up in the right sidebar
+                tempLeaf.tabHeaderEl.hide()
+                const blockKeyEsc = regexEscape(block.key)
+                const blockPageEsc = regexEscape(block.page)
+                const blockKeyClean = cleanHeader(block.key)
+                await tempLeaf.setViewState({
+                    type: "search-ref",
+                    state: {
+                        query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
+                    },
+                })
+                const search = app.workspace.getLeavesOfType("search-ref")
+                const searchElement = createSearchElement(app, search, block)
+                let searchHeight: number
+                if (count === 1) {
+                    searchHeight = 225
+                } else if (count === 2) {
+                    searchHeight = 250
+                } else {
+                    searchHeight = (count + 1) * 85
+                    if (searchHeight < 300) {
+                        searchHeight = 300
+                    } else if (searchHeight > 600) {
+                        searchHeight = 600
+                    }
                 }
-            }
-            searchElement.setAttribute(
-                "style",
-                "height: " + searchHeight + "px;"
-            )
+                searchElement.setAttribute(
+                    "style",
+                    "height: " + searchHeight + "px;"
+                )
 
-            if (!val.children.namedItem("search-ref")) {
-                search[search.length - 1].view.searchQuery
-                // depending on the type of block the search view needs to be inserted into the DOM at different points
-                block.type === "block" &&
+                if (!val.children.namedItem("search-ref")) {
+                    search[search.length - 1].view.searchQuery
+                    // depending on the type of block the search view needs to be inserted into the DOM at different points
+                    block.type === "block" &&
                     val.appendChild(searchElement)
-                block.type === "header" && val.appendChild(searchElement)
-                block.type === "link" && val.append(searchElement)
-            } else {
-                if (val.children.namedItem("search-ref")) {
-                    app.workspace
-                        .getLeavesOfType("search-ref")
-                        .forEach((leaf) => {
-                            const container = leaf.view.containerEl
-                            const dataKey = `[data-block-ref-id='${block.key}']`
-                            const key =
+                    block.type === "header" && val.appendChild(searchElement)
+                    block.type === "link" && val.append(searchElement)
+                } else {
+                    if (val.children.namedItem("search-ref")) {
+                        app.workspace
+                            .getLeavesOfType("search-ref")
+                            .forEach((leaf) => {
+                                const container = leaf.view.containerEl
+                                const dataKey = `[data-block-ref-id='${block.key}']`
+                                const key =
                                 container.parentElement.querySelector(dataKey)
-                            if (key) {
-                                leaf.detach()
-                            }
-                        })
+                                if (key) {
+                                    leaf.detach()
+                                }
+                            })
+                    }
                 }
             }
         })
