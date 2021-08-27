@@ -30,6 +30,7 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
     console.time("indexing")
     pages = []
     const files = app.vault.getMarkdownFiles()
+    console.time("processing files")
     for (const file of files) {
         const cache = app.metadataCache.getFileCache(file)
         if (cache) {
@@ -37,10 +38,15 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
         }
 
     }
+    console.timeEnd("processing files")
+    console.time("building objects")
     buildObjects(pages)
+    console.timeEnd("building objects")
+    console.time("building links")
     buildLinksAndEmbeds(pages)
-    indexerEvent.trigger("index-complete")
+    console.timeEnd("building links")
     console.timeEnd("indexing")
+    indexerEvent.trigger("index-complete")
 }
 
 
@@ -152,7 +158,11 @@ function buildObjects(): void {
 
             })
             page.headings && page.headings.forEach((heading) => {
-                if (link.type === "heading" && cleanHeader(link.id) === cleanHeader(heading.key) && link.page === heading.page) {
+                const needsCleaning = heading.key.match(/[[\]#*():|.]/g)
+                if (needsCleaning) {
+                    heading.key = cleanHeader(heading.key)
+                }
+                if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
 
                     const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
                     if (!isEquivalent(heading.references, object)) {
@@ -188,7 +198,11 @@ function buildLinksAndEmbeds(pages: Page[]): void {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => {
                 if (item.type === "heading") {
-                    if (cleanHeader(ref.key) === cleanHeader(item.id) && ref.page === item.page) { return true } else { return false }
+                    const needsCleaning = ref.key.match(/[[\]#*():|.]/g)
+                    if (needsCleaning) {
+                        ref.key = cleanHeader(ref.key)
+                    }
+                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
                 } else {
                     if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
                 }
@@ -271,5 +285,5 @@ function isEquivalent(set: Set<Reference>, object: Reference): boolean {
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/(\[|\]|#|\*|\(|\)|:)/g, "").replace(/(\||\.)/g, " ")
+    return header.replace(/[\[\]#\*\(\):]/g, "").replace(/[\|\.]/g, " ")
 }
