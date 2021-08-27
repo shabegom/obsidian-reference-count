@@ -46,7 +46,7 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle.setValue(getSettings().displayParent)
                 toggle.onChange(async (val) => {
-                    updateSettings({displayParent: val})
+                    updateSettings({ displayParent: val })
                     await this.plugin.saveSettings()
                 })
             })
@@ -56,7 +56,7 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle.setValue(getSettings().displayChild)
                 toggle.onChange(async (val) => {
-                    updateSettings({displayChild: val})
+                    updateSettings({ displayChild: val })
                     await this.plugin.saveSettings()
                 })
             })
@@ -64,18 +64,16 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
             .setName("Type of Reference Table")
             .setDesc("Choose what type of table you'd like references displayed as.")
             .addDropdown((dropdown) => {
-                const {tableType} = getSettings()
-                dropdown.setValue(tableType)
-                dropdown.addOption("choose", "Choose a Table Type")
+                const { tableType } = getSettings()
                 dropdown.addOption("search", "Search Results Table")
                 dropdown.addOption("basic", "Basic Table")
+                dropdown.setValue(tableType)
                 dropdown.onChange(async (val) => {
-                    if (val === "search" || val === "basic") {
-                        updateSettings({tableType: val})
-                        await this.plugin.saveSettings()
-                        this.plugin.indexDebounce()
-                        this.plugin.previewDebounce()
-                    }
+                    updateSettings({ tableType: val })
+                    await this.plugin.saveSettings()
+                    this.plugin.indexDebounce()
+                    this.plugin.previewDebounce()
+
                 })
             })
     }
