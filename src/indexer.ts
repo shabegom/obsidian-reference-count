@@ -25,8 +25,8 @@ export function getPages(): Page[] {
  * @return  {void}
  */
 
-export function indexBlockReferences(app: App, indexerEvent: Events): void {
-    indexerEvent.trigger("index-in-progress")
+export function indexBlockReferences(app: App): void {
+
     pages = []
     const files = app.vault.getMarkdownFiles()
     for (const file of files) {
@@ -39,7 +39,7 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
 
     buildObjects(pages)
     buildLinksAndEmbeds(pages)
-    indexerEvent.trigger("index-complete")
+
 }
 
 
@@ -151,7 +151,7 @@ function buildObjects(): void {
 
             })
             page.headings && page.headings.forEach((heading) => {
-                const needsCleaning = heading.key.match(/[[\]#*():|.]/g)
+                const needsCleaning = heading.key.match(/[^\w\s-]/g)
                 if (needsCleaning) {
                     heading.key = cleanHeader(heading.key)
                 }
@@ -191,7 +191,7 @@ function buildLinksAndEmbeds(pages: Page[]): void {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => {
                 if (item.type === "heading") {
-                    const needsCleaning = ref.key.match(/[[\]#*():|.]/g)
+                    const needsCleaning = ref.key.match(/[^\w\s-]/g)
                     if (needsCleaning) {
                         ref.key = cleanHeader(ref.key)
                     }
@@ -278,5 +278,5 @@ function isEquivalent(set: Set<Reference>, object: Reference): boolean {
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[\[\]#\*\(\):]/g, "").replace(/[\|\.]/g, " ")
+    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s-]/g, "")
 }

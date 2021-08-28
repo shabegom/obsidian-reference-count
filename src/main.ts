@@ -17,6 +17,7 @@ import {
     getSettings,
     updateSettings,
 } from "./settings"
+import { isEqual } from "lodash"
 
 
 
@@ -30,11 +31,7 @@ import {
  */
 export default class BlockRefCounter extends Plugin {
     private resolved: EventRef
-    private indexer = new Events()
-    private indexStatus: string
     private typingIndicator: boolean
-    public previewDebounce: () => void
-    public indexDebounce: () => void
 
 
     async onload(): Promise<void> {
@@ -45,24 +42,7 @@ export default class BlockRefCounter extends Plugin {
         unloadSearchViews(this.app)
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this))
-        /**
-         * Setting the indexStatus so we don't overindex
-         */
-        this.registerEvent(
-            this.indexer.on("index-in-progress", () => {
-                this.indexStatus = "in-progress"
-            })
-        )
-
-        // three second debounce so we don't index repeatedly on meta changes
-        const completionDebounce = debounce(() => {
-            this.indexStatus = "complete"
-        }, 1000)
-        this.registerEvent(
-            this.indexer.on("index-complete", () => {
-                completionDebounce()
-            })
-        )
+      
 
         const typingDebounce = debounce(() => {
             this.typingIndicator = false
@@ -72,10 +52,11 @@ export default class BlockRefCounter extends Plugin {
             typingDebounce()
         })
 
-        const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer, true), 5000)
-        this.indexDebounce = indexDebounce
+        const indexDebounce = debounce(() => indexBlockReferences(this.app), 1000)
+        const indexShortDebounce = debounce(() => indexBlockReferences(this.app), 500)
+
         const previewDebounce = debounce(() => createPreviewView(this.app), 500, true)
-        this.previewDebounce = previewDebounce
+    
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -84,13 +65,13 @@ export default class BlockRefCounter extends Plugin {
          */
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
-                indexBlockReferences(this.app, this.indexer)
-                previewDebounce()
+                indexBlockReferences(this.app)
+                createPreviewView(this.app)
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
-            indexBlockReferences(this.app, this.indexer)
-            previewDebounce()
+            indexBlockReferences(this.app)
+            createPreviewView(this.app)
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -110,16 +91,20 @@ export default class BlockRefCounter extends Plugin {
         this.registerEvent(
             this.app.metadataCache.on("resolved", () => {
                 previewDebounce()
-                if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexDebounce()
+                if (!this.typingIndicator) {
+                    if (checkForChanges(this.app)) {
+                        indexDebounce()
+                    }
                 }
             })
         )
 
         this.registerEvent(
             this.app.vault.on("delete", () => {
-                if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexDebounce()
+                if (!this.typingIndicator) {
+                    if (checkForChanges(this.app)) {
+                        indexShortDebounce()
+                    }
                 }
             })
         )
@@ -130,44 +115,51 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                previewDebounce()
-                if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexDebounce()
+                if (!this.typingIndicator) {
+                    if (checkForChanges(this.app)) {
+                        indexShortDebounce()
+                    }
                 }
+                createPreviewView(this.app)
             })
         )
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => {
-                previewDebounce()
-                if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexDebounce()
+                if (!this.typingIndicator) {
+                    if (checkForChanges(this.app)) {
+                        indexShortDebounce()
+                    
+                    }
                 }
+                createPreviewView(this.app)
             })
         )
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-                previewDebounce()
-                if (this.indexStatus === "complete" && !this.typingIndicator) {
-                    indexDebounce()
+                if (!this.typingIndicator) {
+                    if (checkForChanges(this.app)) {
+                        indexShortDebounce()
+                    }
                 }
+                createPreviewView(this.app)
 
             })
         )
 
-        const postProcess: MarkdownPostProcessor = async (el, ctx) => {
+        this.registerMarkdownPostProcessor(async (el, ctx) => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
-            const {lineStart} = ctx.getSectionInfo(el)
+            const sectionInfo = ctx.getSectionInfo(el)
+            const lineStart = sectionInfo && sectionInfo.lineStart
             const page = getPage(path)
-            if (page) {
+            if (page && lineStart) {
                 processPage(page, this.app, el, lineStart)
             }
-           previewDebounce()
-        }
-        postProcess.sortOrder = 99
-        this.registerMarkdownPostProcessor(postProcess)
+            createPreviewView(this.app)
+            indexDebounce()
+        })
 
 
         //This runs only one time at beginning when Obsidian is completely loaded after startup
@@ -622,4 +614,21 @@ function getPage(sourcePath: string) {
             return acc
         })
 
+}
+
+//get the current active page and compare the cache to what is in the index
+function checkForChanges(app: App) {
+    const activeView = app.workspace.getActiveViewOfType(MarkdownView)
+    if (activeView) {
+        const activePage = getPage(activeView.file.path)
+        if (activePage) {
+            const currentCache = app.metadataCache.getFileCache(activeView.file)
+            if (currentCache) {
+                if (!isEqual(currentCache, activePage.cache)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
 }
