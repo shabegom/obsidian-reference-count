@@ -8,6 +8,7 @@ import {
     MarkdownView,
     TFile,
     Notice,
+    MarkdownPostProcessor,
 } from "obsidian"
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
@@ -32,8 +33,6 @@ export default class BlockRefCounter extends Plugin {
     private indexer = new Events()
     private indexStatus: string
     private typingIndicator: boolean
-    public previewDebounce: () => void
-    public indexDebounce: () => void
 
 
     async onload(): Promise<void> {
@@ -72,9 +71,8 @@ export default class BlockRefCounter extends Plugin {
         })
 
         const indexDebounce = debounce(() => indexBlockReferences(this.app, this.indexer, true), 5000)
-        this.indexDebounce = indexDebounce
-        const previewDebounce = debounce(() => createPreviewView(this.app), 500, true)
-        this.previewDebounce = previewDebounce
+
+
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -84,12 +82,10 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 indexBlockReferences(this.app, this.indexer)
-                previewDebounce()
                 this.app.metadataCache.offref(this.resolved)
             })
         } else {
             indexBlockReferences(this.app, this.indexer)
-            previewDebounce()
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -111,7 +107,6 @@ export default class BlockRefCounter extends Plugin {
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
                     indexDebounce()
                 }
-                previewDebounce()
             })
         )
 
@@ -129,7 +124,6 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                previewDebounce()
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
                     indexDebounce()
                 }
@@ -138,7 +132,6 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => {
-                previewDebounce()
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
                     indexDebounce()
                 }
@@ -147,7 +140,6 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-                previewDebounce()
                 if (this.indexStatus === "complete" && !this.typingIndicator) {
                     indexDebounce()
                 }
@@ -155,16 +147,19 @@ export default class BlockRefCounter extends Plugin {
             })
         )
 
-        this.registerMarkdownPostProcessor((el, ctx) => {
+        const postProcess: MarkdownPostProcessor = async (el, ctx) => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView)
             const path = view.file.path
-            const {lineStart} = ctx.getSectionInfo(el)
+            const sectionInfo = ctx.getSectionInfo(el)
+            const lineStart = sectionInfo && sectionInfo.lineStart
             const page = getPage(path)
-            if (page) {
+            if (page && lineStart) {
                 processPage(page, this.app, el, lineStart)
             }
-            previewDebounce()
-        })
+        }
+        postProcess.sortOrder = 999
+        this.registerMarkdownPostProcessor(postProcess)
+
 
         //This runs only one time at beginning when Obsidian is completely loaded after startup
         this.registerEvent(
@@ -188,37 +183,6 @@ export default class BlockRefCounter extends Plugin {
     }
 }
 
-/**
- * Finds the sections present in a note's Preview, iterates them and adds references if required
- * This duplicates some of the functionality of onMarkdownPostProcessor, but is fired on layout and leaf changes
- * @param   {App}                   app
- * @return  {void}
- */
-function createPreviewView(
-    app: App,
-): void {
-    let view
-    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView)
-    if (activeLeaf) {
-        view = activeLeaf.view
-    } else {
-        view = null
-    }
-    if (!view) {
-        return
-    }
-    const sourcePath = view.file?.path
-    // if previewMode exists and has sections, get the sections
-    const elements = view.previewMode?.renderer?.sections
-    const page = getPage(sourcePath)
-    if (page && elements) {
-        elements.forEach(
-            (section: { el: HTMLElement; lineStart: number }) => {
-                processPage(page, app, section.el, section.lineStart)
-            }
-        )
-    }
-}
 
 function processPage(
     page: {
@@ -243,12 +207,12 @@ function processPage(
                 const hasEmbed = embeds.length > 0 ? true : false
                 if (
                     (settings.displayParent &&
-                    page.blocks &&
-                    !hasEmbed &&
-                    type === "paragraph") ||
-                type === "list" ||
-                type === "blockquote" ||
-                type === "code"
+                        page.blocks &&
+                        !hasEmbed &&
+                        type === "paragraph") ||
+                    type === "list" ||
+                    type === "blockquote" ||
+                    type === "code"
                 ) {
                     addBlockReferences(app, el, page.blocks, pageSection)
                 }
@@ -364,7 +328,7 @@ function addLinkReferences(
                     })
                 if (link.reference && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
-                    
+
                     createButtonElement(app, link.reference, buttons[index])
                 }
             })
@@ -406,7 +370,7 @@ function addHeaderReferences(
  * @return  {void}
  */
 function createButtonElement(
-    app:  App,
+    app: App,
     block: Block | Heading,
     val: HTMLElement
 ): void {
@@ -422,14 +386,14 @@ function createButtonElement(
             countEl.addClass("parent-ref")
         }
         countEl.innerText = count.toString()
-        const {tableType} = getSettings()
+        const { tableType } = getSettings()
 
         if (tableType === "basic") {
             const refs = block.references ? Array.from(block.references) : undefined
             const refTable: HTMLElement = createTable(app, val, refs)
             countEl.on("click", "button", () => {
                 if (!val.children.namedItem("ref-table")) {
-                    block.type === "block"  && val.appendChild(refTable)
+                    block.type === "block" && val.appendChild(refTable)
                     block.type === "header" && val.appendChild(refTable)
                     block.type === "link" && val.append(refTable)
                 } else {
@@ -442,7 +406,8 @@ function createButtonElement(
         if (tableType === "search") {
             countEl.on("click", "button", async () => {
                 const searchEnabled = app.internalPlugins.getPluginById("global-search").enabled
-                if (!searchEnabled) {new Notice("you need to enable the core search plugin")
+                if (!searchEnabled) {
+                    new Notice("you need to enable the core search plugin")
                 } else {
                     const tempLeaf = app.workspace.getRightLeaf(false)
                     //Hide the leaf/pane so it doesn't show up in the right sidebar
@@ -480,7 +445,7 @@ function createButtonElement(
                         search[search.length - 1].view.searchQuery
                         // depending on the type of block the search view needs to be inserted into the DOM at different points
                         block.type === "block" &&
-                    val.appendChild(searchElement)
+                            val.appendChild(searchElement)
                         block.type === "header" && val.appendChild(searchElement)
                         block.type === "link" && val.append(searchElement)
                     } else {
@@ -491,7 +456,7 @@ function createButtonElement(
                                     const container = leaf.view.containerEl
                                     const dataKey = `[data-block-ref-id='${block.key}']`
                                     const key =
-                                container.parentElement.querySelector(dataKey)
+                                        container.parentElement.querySelector(dataKey)
                                     if (key) {
                                         leaf.detach()
                                     }
@@ -532,25 +497,25 @@ function createSearchElement(app: App, search: any, block: Block) {
 
 
 function createTable(app: App, val: HTMLElement, refs: Reference[]): HTMLElement {
-    const refTable = createEl("table", {cls: "ref-table"})
+    const refTable = createEl("table", { cls: "ref-table" })
     refTable.setAttribute("id", "ref-table")
-    const noteHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Note"}))
-    const lineHeaderRow = createEl("tr").appendChild(createEl("th", {text: "Reference", cls: "reference"}))
-    const removeTable = createEl("button", {text: "x" })
+    const noteHeaderRow = createEl("tr").appendChild(createEl("th", { text: "Note" }))
+    const lineHeaderRow = createEl("tr").appendChild(createEl("th", { text: "Reference", cls: "reference" }))
+    const removeTable = createEl("button", { text: "x" })
     removeTable.addClass("table-close")
     lineHeaderRow.appendChild(removeTable)
-    removeTable.on("click", "button", () => {val.removeChild(refTable)})
+    removeTable.on("click", "button", () => { val.removeChild(refTable) })
     refTable.appendChild(noteHeaderRow)
     refTable.appendChild(lineHeaderRow)
     refTable.appendChild(removeTable)
-    refs && refs.forEach(async ( ref ) => {
+    refs && refs.forEach(async (ref) => {
         const file = await app.vault.getAbstractFileByPath(ref.path) as TFile
         const lineContent = await app.vault.cachedRead(file).then(content => content.split("\n")[ref.pos])
         const row = createEl("tr")
         const noteCell = createEl("td")
         const lineCell = createEl("td")
         noteCell.appendChild(createEl("a", { cls: "internal-link", href: ref.path, text: ref.basename }))
-        lineCell.appendChild(createEl("span", {text: lineContent}))
+        lineCell.appendChild(createEl("span", { text: lineContent }))
         row.appendChild(noteCell)
         row.appendChild(lineCell)
         refTable.appendChild(row)

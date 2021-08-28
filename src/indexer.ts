@@ -27,10 +27,8 @@ export function getPages(): Page[] {
 
 export function indexBlockReferences(app: App, indexerEvent: Events): void {
     indexerEvent.trigger("index-in-progress")
-    console.time("indexing")
     pages = []
     const files = app.vault.getMarkdownFiles()
-    console.time("processing files")
     for (const file of files) {
         const cache = app.metadataCache.getFileCache(file)
         if (cache) {
@@ -38,14 +36,9 @@ export function indexBlockReferences(app: App, indexerEvent: Events): void {
         }
 
     }
-    console.timeEnd("processing files")
-    console.time("building objects")
+
     buildObjects(pages)
-    console.timeEnd("building objects")
-    console.time("building links")
     buildLinksAndEmbeds(pages)
-    console.timeEnd("building links")
-    console.timeEnd("indexing")
     indexerEvent.trigger("index-complete")
 }
 
