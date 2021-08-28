@@ -4,11 +4,9 @@ import {
     Plugin,
     WorkspaceLeaf,
     View,
-    Events,
     MarkdownView,
     TFile,
     Notice,
-    MarkdownPostProcessor,
 } from "obsidian"
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
@@ -52,8 +50,8 @@ export default class BlockRefCounter extends Plugin {
             typingDebounce()
         })
 
-        const indexDebounce = debounce(() => indexBlockReferences(this.app), 1000)
-        const indexShortDebounce = debounce(() => indexBlockReferences(this.app), 500)
+        const indexDebounce = debounce(() => indexBlockReferences(this.app), 5000, true)
+        const indexShortDebounce = debounce(() => indexBlockReferences(this.app), 300)
 
         const previewDebounce = debounce(() => createPreviewView(this.app), 500, true)
     
@@ -89,7 +87,7 @@ export default class BlockRefCounter extends Plugin {
          * triggers creation of block ref buttons on the preview view
          */
         this.registerEvent(
-            this.app.metadataCache.on("resolved", () => {
+            this.app.metadataCache.on("changed", () => {
                 previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
@@ -115,17 +113,30 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
+                previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexShortDebounce()
                     }
                 }
-                createPreviewView(this.app)
+                const activeLeaf = this.app.workspace.getActiveLeafOfViewType(MarkdownView)
+                if (activeLeaf) {
+                    try {
+                        activeLeaf.previewMode?.renderer.onRendered(
+                            () => {
+                                createPreviewView(this.app )
+                            }
+                        )
+                    } catch (e) {
+                        console.log(e)
+                    }
+                }
             })
         )
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => {
+
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexShortDebounce()
@@ -138,13 +149,13 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
+
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexShortDebounce()
                     }
                 }
                 createPreviewView(this.app)
-
             })
         )
 
@@ -157,8 +168,9 @@ export default class BlockRefCounter extends Plugin {
             if (page && lineStart) {
                 processPage(page, this.app, el, lineStart)
             }
-            createPreviewView(this.app)
-            indexDebounce()
+            if (checkForChanges(this.app)) {
+                indexDebounce()
+            }
         })
 
 
