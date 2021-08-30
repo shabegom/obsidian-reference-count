@@ -121,7 +121,6 @@ export default class BlockRefCounter extends Plugin {
                 }
                 const activeLeaf = this.app.workspace.getActiveLeafOfViewType(MarkdownView)
                 if (activeLeaf) {
-                    console.log(activeLeaf.currentMode.type)
                     try {
                         activeLeaf.previewMode?.renderer.onRendered(
                             () => {
