@@ -644,7 +644,7 @@ function checkForChanges(app: App) {
         if (activePage) {
             const currentCache = app.metadataCache.getFileCache(activeView.file)
             if (currentCache) {
-                const {links, headings, blocks, embeds} = currentCache
+                const { links, headings, blocks, embeds } = currentCache
                 if (!isEqual(activePage.cache.links, links) || !isEqual(activePage.cache.headings, headings) || !isEqual(activePage.cache.blocks, blocks) || !isEqual(activePage.cache.embeds, embeds)) {
                     return true
                 }
