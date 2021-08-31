@@ -26,6 +26,7 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
+    console.time("indexBlockReferences")
     pages = []
     const files = app.vault.getMarkdownFiles()
     for (const file of files) {
@@ -36,8 +37,9 @@ export function indexBlockReferences(app: App): void {
 
     }
 
-    buildObjects(pages)
-    buildLinksAndEmbeds(pages)
+    buildObjects()
+    buildLinksAndEmbeds()
+    console.timeEnd("indexBlockReferences")
 }
 
 
@@ -179,7 +181,7 @@ function buildObjects(): void {
  * @return  {void}             
  */
 
-function buildLinksAndEmbeds(pages: Page[]): void {
+function buildLinksAndEmbeds(): void {
     const allRefs = pages.reduce((acc, page) => {
         page.blocks && acc.push(...page.blocks)
         page.headings && acc.push(...page.headings)

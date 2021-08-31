@@ -91,6 +91,7 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
+                        console.log("cache changed, re-indexing")
                         indexDebounce()
                     }
                 }
@@ -101,6 +102,7 @@ export default class BlockRefCounter extends Plugin {
             this.app.vault.on("delete", () => {
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
+                        console.log("file deleted, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -116,6 +118,7 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
+                        console.log("layout changed, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -139,6 +142,7 @@ export default class BlockRefCounter extends Plugin {
 
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
+                        console.log("active leaf changed, re-indexing")
                         indexShortDebounce()
 
                     }
@@ -152,6 +156,7 @@ export default class BlockRefCounter extends Plugin {
 
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
+                        console.log("file opened, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -171,6 +176,7 @@ export default class BlockRefCounter extends Plugin {
                 }
             }
             if (checkForChanges(this.app)) {
+                console.log("markdown-post, re-indexing")
                 indexDebounce()
             }
         })
@@ -620,7 +626,6 @@ function debounce(func: () => void, wait: number, immediate?: boolean) {
 //utility function to fetch a specific page from the index
 function getPage(sourcePath: string) {
     const pages = getPages()
-
     return pages[0] &&
         getPages().reduce((acc, page) => {
             if (page.file.path === sourcePath) {
@@ -639,7 +644,8 @@ function checkForChanges(app: App) {
         if (activePage) {
             const currentCache = app.metadataCache.getFileCache(activeView.file)
             if (currentCache) {
-                if (!isEqual(currentCache, activePage.cache)) {
+                const {links, headings, blocks, embeds} = currentCache
+                if (!isEqual(activePage.cache.links, links) || !isEqual(activePage.cache.headings, headings) || !isEqual(activePage.cache.blocks, blocks) || !isEqual(activePage.cache.embeds, embeds)) {
                     return true
                 }
             }
