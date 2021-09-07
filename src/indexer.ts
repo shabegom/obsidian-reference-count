@@ -26,7 +26,6 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
-    console.time("indexBlockReferences")
     pages = []
     const files = app.vault.getMarkdownFiles()
     for (const file of files) {
@@ -39,7 +38,6 @@ export function indexBlockReferences(app: App): void {
 
     buildObjects()
     buildLinksAndEmbeds()
-    console.timeEnd("indexBlockReferences")
 }
 
 
@@ -151,7 +149,7 @@ function buildObjects(): void {
 
             })
             page.headings && page.headings.forEach((heading) => {
-                const needsCleaning = heading.key.match(/[^\w\s-]/g)
+                const needsCleaning = heading.key.match(/[^\w\s\-']/g)
                 if (needsCleaning) {
                     heading.key = cleanHeader(heading.key)
                 }
@@ -191,7 +189,7 @@ function buildLinksAndEmbeds(): void {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => {
                 if (item.type === "heading") {
-                    const needsCleaning = ref.key.match(/[^\w\s-]/g)
+                    const needsCleaning = ref.key.match(/[^\w\s\-']/g)
                     if (needsCleaning) {
                         ref.key = cleanHeader(ref.key)
                     }
@@ -278,5 +276,5 @@ function isEquivalent(set: Set<Reference>, object: Reference): boolean {
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s-]/g, "")
+    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s\-']/g, "")
 }

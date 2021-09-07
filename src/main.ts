@@ -99,7 +99,6 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("cache changed, re-indexing")
                         indexDebounce()
                     }
                 }
@@ -110,7 +109,6 @@ export default class BlockRefCounter extends Plugin {
             this.app.vault.on("delete", () => {
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("file deleted, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -126,7 +124,6 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce()
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("layout changed, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -148,7 +145,6 @@ export default class BlockRefCounter extends Plugin {
             this.app.workspace.on("active-leaf-change", () => {
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("active leaf changed, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -160,7 +156,6 @@ export default class BlockRefCounter extends Plugin {
             this.app.workspace.on("file-open", () => {
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("file opened, re-indexing")
                         indexShortDebounce()
                     }
                 }
@@ -180,7 +175,6 @@ export default class BlockRefCounter extends Plugin {
                 }
             }
             if (checkForChanges(this.app)) {
-                console.log("markdown-post, re-indexing")
                 indexDebounce()
             }
         })
