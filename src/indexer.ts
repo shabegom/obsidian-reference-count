@@ -221,15 +221,15 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
         items.forEach((item) => {
-            const [note, id] = item.link.split("^")
             const pos = item.position.start.line
-            const page = parseLinktext(note).path
-            const header = item.link.match(/.*#(.*)/)
-            const embed = item.original.match(/^!/) ? true : false
-            if (id) {
+            const parsedLink = parseLinktext(item.link)
+            const page = parsedLink.path
+            const header = parsedLink.subpath
+            const embed = parsedLink.subpath.startsWith("#^") ? true : false
+            if (embed) {
                 foundItems.push(
                     {
-                        id,
+                        id: header.split("#^")[1],
                         pos,
                         page,
                         file,
@@ -238,10 +238,10 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
                     }
                 )
             }
-            if (header && header[1] && !header[1].startsWith("^")) {
+            if (header && !header.startsWith("#^")) {
                 foundItems.push(
                     {
-                        id: header[1],
+                        id: header,
                         pos,
                         page,
                         file,
