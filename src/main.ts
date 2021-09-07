@@ -54,7 +54,7 @@ export default class BlockRefCounter extends Plugin {
         )
         const indexShortDebounce = debounce(
             () => indexBlockReferences(this.app),
-            300,
+            500,
             true
         )
 
