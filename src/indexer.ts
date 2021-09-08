@@ -26,6 +26,7 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
+    console.time("indexBlockReferences")
     pages = []
     const files = app.vault.getMarkdownFiles()
     for (const file of files) {
@@ -38,6 +39,7 @@ export function indexBlockReferences(app: App): void {
 
     buildObjects()
     buildLinksAndEmbeds()
+    console.timeEnd("indexBlockReferences")
 }
 
 
@@ -154,7 +156,6 @@ function buildObjects(): void {
                     heading.key = cleanHeader(heading.key)
                 }
                 if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
-
                     const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
                     if (!isEquivalent(heading.references, object)) {
                         heading.references = heading.references ? heading.references : new Set()
@@ -223,11 +224,12 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
             const parsedLink = parseLinktext(item.link)
             const page = parsedLink.path
             const header = parsedLink.subpath
-            const embed = parsedLink.subpath.startsWith("#^") ? true : false
-            if (embed) {
+            const id = header.split("^")[1]
+            const embed = item.original.match(/^!/) ? true : false
+            if (id) {
                 foundItems.push(
                     {
-                        id: header.split("#^")[1],
+                        id,
                         pos,
                         page,
                         file,
@@ -236,10 +238,10 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
                     }
                 )
             }
-            if (header && !header.startsWith("#^")) {
+            if (header && !id) {
                 foundItems.push(
                     {
-                        id: header,
+                        id: header.replace("#",""),
                         pos,
                         page,
                         file,
@@ -276,5 +278,5 @@ function isEquivalent(set: Set<Reference>, object: Reference): boolean {
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s\-']/g, "")
+    return header.replace(/[|.]([^\s])/g, " $1").replace(/[^\w\s]/g, "").replace(/\s\s+/g, " ")
 }

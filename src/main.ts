@@ -16,7 +16,7 @@ import {
     getSettings,
     updateSettings,
 } from "./settings"
-import isEqual from "lodash.isequal"
+
 
 /**
  * BlockRefCounter Plugin
@@ -41,7 +41,7 @@ export default class BlockRefCounter extends Plugin {
 
         const typingDebounce = debounce(() => {
             this.typingIndicator = false
-        }, 500, true)
+        }, 1000, true)
         this.registerDomEvent(document, "keyup", () => {
             this.typingIndicator = true
             typingDebounce()
@@ -419,6 +419,7 @@ function createButtonElement(
 ): void {
     if (val) {
         const count = block && block.references ? block.references.size : 0
+        const normalizedKey = normalize(block.key)
         const existingButton = val.querySelector("#count")
         const countEl = createEl("button", { cls: "block-ref-count" })
         countEl.setAttribute("data-block-ref-id", block.key)
@@ -504,7 +505,7 @@ function createButtonElement(
                                 .getLeavesOfType("search-ref")
                                 .forEach((leaf) => {
                                     const container = leaf.view.containerEl
-                                    const dataKey = `[data-block-ref-id='${block.key}']`
+                                    const dataKey = `[data-block-ref-id='${normalizedKey}']`
                                     const key =
                                         container.parentElement.querySelector(
                                             dataKey
@@ -527,7 +528,8 @@ function createButtonElement(
 
 function createSearchElement(app: App, search: any, block: Block) {
     const searchElement = search[search.length - 1].view.containerEl
-    searchElement.setAttribute("data-block-ref-id", block.key)
+    const normalizedKey = normalize(block.key)
+    searchElement.setAttribute("data-block-ref-id", normalizedKey)
     const toolbar = searchElement.querySelector(".nav-buttons-container")
     const closeButton = createEl("button", {
         cls: "search-input-clear-button",
@@ -535,7 +537,7 @@ function createSearchElement(app: App, search: any, block: Block) {
     closeButton.on("click", "button", () => {
         app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
             const container = leaf.view.containerEl
-            const dataKey = `[data-block-ref-id='${block.key}']`
+            const dataKey = `[data-block-ref-id='${normalizedKey}']`
             const key = container.parentElement.querySelector(dataKey)
             if (key) {
                 leaf.detach()
@@ -658,4 +660,26 @@ function checkForChanges(app: App) {
         }
         return false
     }
+}
+
+const normalize = (str: string) => {
+    return str.replace(/\s+|'/g, "").toLowerCase()
+}
+
+const isEqual = (a: any, b: any) => {
+    if (a === b) return true
+    if (a == null || b == null) return false
+    if (a.constructor !== b.constructor) return false
+    const keys = Object.keys(a)
+    const length = keys.length
+    if (length !== Object.keys(b).length) return false
+    for (let i = 0; i < length; i++) {
+        if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false
+        if (
+            a[keys[i]] === b[keys[i]] ||
+            isEqual(a[keys[i]], b[keys[i]])
+        )
+            return true
+    }
+    return true
 }
