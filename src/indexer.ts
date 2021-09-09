@@ -1,9 +1,9 @@
 
-import { App, CachedMetadata, EmbedCache, Events, LinkCache, ListItemCache, SectionCache, TFile, parseLinktext } from "obsidian"
-import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types"
+import { App, CachedMetadata, EmbedCache, Events, LinkCache, ListItemCache, SectionCache, TFile, parseLinktext } from "obsidian";
+import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types";
 
 // global index of pages with associated block references
-let pages: Page[] = []
+let pages: Page[] = [];
 
 /**
  * creates a copy of the pages index for use in building block ref buttons
@@ -12,7 +12,7 @@ let pages: Page[] = []
  */
 
 export function getPages(): Page[] {
-    return [...pages]
+    return [...pages];
 }
 
 
@@ -26,20 +26,20 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
-    console.time("indexBlockReferences")
-    pages = []
-    const files = app.vault.getMarkdownFiles()
+    console.time("indexBlockReferences");
+    pages = [];
+    const files = app.vault.getMarkdownFiles();
     for (const file of files) {
-        const cache = app.metadataCache.getFileCache(file)
+        const cache = app.metadataCache.getFileCache(file);
         if (cache) {
-            buildPagesArray(file, cache)
+            buildPagesArray(file, cache);
         }
 
     }
 
-    buildObjects()
-    buildLinksAndEmbeds()
-    console.timeEnd("indexBlockReferences")
+    buildObjects();
+    buildLinksAndEmbeds();
+    console.timeEnd("indexBlockReferences");
 }
 
 
@@ -57,13 +57,13 @@ export function indexBlockReferences(app: App): void {
  * @return  {void}                      
  */
 function buildPagesArray( file: TFile, cache: CachedMetadata): void {
-    const {embeds = [], links = [], headings, blocks, sections, listItems} = cache
+    const {embeds = [], links = [], headings, blocks, sections, listItems} = cache;
     const blocksArray = blocks && Object.values(blocks).map((block) => ({
         key: block.id,
         pos: block.position.start.line,
         page: file.basename,
         type: "block"
-    }))
+    }));
 
     const headingsArray = headings && headings.map((header: { heading: any; position: { start: { line: any } } }) => ({
         key: header.heading,
@@ -71,9 +71,9 @@ function buildPagesArray( file: TFile, cache: CachedMetadata): void {
 
         page: file.basename,
         type: "header"
-    }))
-    const foundItems = findItems([...embeds, ...links], file)
-    const listSections = createListSections(sections, listItems)
+    }));
+    const foundItems = findItems([...embeds, ...links], file);
+    const listSections = createListSections(sections, listItems);
 
     if (foundItems) {
         pages.push({
@@ -83,7 +83,7 @@ function buildPagesArray( file: TFile, cache: CachedMetadata): void {
             file,
             sections: listSections,
             cache
-        })
+        });
     }
 }
 
@@ -102,21 +102,21 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
 
     if (listItems) {
         return sections.map((section) => {
-            const items: ListItem[] = []
+            const items: ListItem[] = [];
             if (section.type === "list") {
                 listItems.forEach((item: ListItem) => {
                     if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
-                        items.push({ pos: item.position.start.line, ...item })
+                        items.push({ pos: item.position.start.line, ...item });
                     }
-                })
-                const sectionWithItems = { items, ...section }
-                return sectionWithItems
+                });
+                const sectionWithItems = { items, ...section };
+                return sectionWithItems;
             }
-            return section
-        })
+            return section;
+        });
     }
   
-    return sections
+    return sections;
 }
 
 
@@ -132,42 +132,42 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
 
 function buildObjects(): void {
     const allLinks = pages.reduce((acc, page) => {
-        acc.push(...page.items)
-        return acc
-    }, [])
+        acc.push(...page.items);
+        return acc;
+    }, []);
 
     pages.forEach(page => {
         allLinks.forEach(link => {
             page.blocks && page.blocks.forEach(block => {
                 if (link.type === "block" && link.id === block.key && link.page === block.page) {
 
-                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
+                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos };
                     if (!isEquivalent(block.references, object)) {
-                        block.references = block.references ? block.references : new Set()
-                        block.references.add(object)
+                        block.references = block.references ? block.references : new Set();
+                        block.references.add(object);
                     }
 
                 }
 
-            })
+            });
             page.headings && page.headings.forEach((heading) => {
-                const needsCleaning = heading.key.match(/[^\w\s-]/g)
+                const needsCleaning = heading.key.match(/[^\w\s-]/g);
                 if (needsCleaning) {
-                    heading.key = cleanHeader(heading.key)
+                    heading.key = cleanHeader(heading.key);
                 }
                 if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
 
-                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
+                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos };
                     if (!isEquivalent(heading.references, object)) {
-                        heading.references = heading.references ? heading.references : new Set()
-                        heading.references.add(object)
+                        heading.references = heading.references ? heading.references : new Set();
+                        heading.references.add(object);
                     }
 
 
                 }
-            })
-        })
-    })
+            });
+        });
+    });
 
 }
 
@@ -183,27 +183,27 @@ function buildObjects(): void {
 
 function buildLinksAndEmbeds(): void {
     const allRefs = pages.reduce((acc, page) => {
-        page.blocks && acc.push(...page.blocks)
-        page.headings && acc.push(...page.headings)
-        return acc
-    }, [])
+        page.blocks && acc.push(...page.blocks);
+        page.headings && acc.push(...page.headings);
+        return acc;
+    }, []);
     pages.forEach(page => {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => {
                 if (item.type === "heading") {
-                    const needsCleaning = ref.key.match(/[^\w\s-]/g)
+                    const needsCleaning = ref.key.match(/[^\w\s-]/g);
                     if (needsCleaning) {
-                        ref.key = cleanHeader(ref.key)
+                        ref.key = cleanHeader(ref.key);
                     }
-                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
+                    if (ref.key === item.id && ref.page === item.page) { return true; } else { return false; }
                 } else {
-                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
+                    if (ref.key === item.id && ref.page === item.page) { return true; } else { return false; }
                 }
-            })
-            item.reference = ref && { ...ref, type: "link" }
+            });
+            item.reference = ref && { ...ref, type: "link" };
 
-        })
-    })
+        });
+    });
 }
 
 
@@ -218,14 +218,14 @@ function buildLinksAndEmbeds(): void {
 
 function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkItem[] {
 
-    const foundItems: EmbedOrLinkItem[] = []
+    const foundItems: EmbedOrLinkItem[] = [];
     if (items) {
         items.forEach((item) => {
-            const [note, id] = item.link.split("^")
-            const pos = item.position.start.line
-            const page = parseLinktext(note).path
-            const header = item.link.match(/.*#(.*)/)
-            const embed = item.original.match(/^!/) ? true : false
+            const [note, id] = item.link.split("^");
+            const pos = item.position.start.line;
+            const page = parseLinktext(note).path;
+            const header = item.link.match(/.*#(.*)/);
+            const embed = item.original.match(/^!/) ? true : false;
             if (id) {
                 foundItems.push(
                     {
@@ -236,7 +236,7 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
                         type: "block",
                         embed,
                     }
-                )
+                );
             }
             if (header && header[1] && !header[1].startsWith("^")) {
                 foundItems.push(
@@ -249,12 +249,12 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
                         embed,
 
                     }
-                )
+                );
             }
-        })
+        });
     }
 
-    return foundItems
+    return foundItems;
 
 }
 
@@ -268,15 +268,15 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
  * @return  {boolean}             true if object exists in Set
  */
 function isEquivalent(set: Set<Reference>, object: Reference): boolean {
-    let equiv = false
+    let equiv = false;
     set && set.forEach((setObject) => {
         if (setObject.pos === object.pos && setObject.path === object.path) {
-            equiv = true
+            equiv = true;
         }
-    })
-    return equiv
+    });
+    return equiv;
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s-]/g, "")
+    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s-]/g, "");
 }

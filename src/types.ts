@@ -1,4 +1,4 @@
-import { App, TFile, BlockCache, LinkCache, EmbedCache, SectionCache, ListItemCache, HeadingCache, Pos, CachedMetadata } from "obsidian"
+import { App, TFile, BlockCache, LinkCache, EmbedCache, SectionCache, ListItemCache, HeadingCache, Pos, CachedMetadata } from "obsidian";
 
 declare module "obsidian" {
   interface App {

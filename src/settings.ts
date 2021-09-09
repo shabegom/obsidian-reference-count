@@ -1,5 +1,5 @@
-import { App, Setting, PluginSettingTab, } from "obsidian"
-import BlockRefCounter from "./main"
+import { App, Setting, PluginSettingTab, } from "obsidian";
+import BlockRefCounter from "./main";
 
 export interface BlockRefCountSettings {
     displayParent: boolean
@@ -11,70 +11,70 @@ export const DEFAULT_SETTINGS: BlockRefCountSettings = {
     displayParent: true,
     displayChild: true,
     tableType: "search"
-}
+};
 
-let settings: BlockRefCountSettings = { ...DEFAULT_SETTINGS }
+let settings: BlockRefCountSettings = { ...DEFAULT_SETTINGS };
 
 export const getSettings = (): BlockRefCountSettings => {
-    return { ...settings }
-}
+    return { ...settings };
+};
 
 export const updateSettings = (newSettings: Partial<BlockRefCountSettings>): BlockRefCountSettings => {
-    settings = { ...settings, ...newSettings }
+    settings = { ...settings, ...newSettings };
 
-    return getSettings()
-}
+    return getSettings();
+};
 
 export class BlockRefCountSettingTab extends PluginSettingTab {
     plugin: BlockRefCounter;
 
     constructor(app: App, plugin: BlockRefCounter) {
-        super(app, plugin)
-        this.plugin = plugin
+        super(app, plugin);
+        this.plugin = plugin;
     }
 
     display(): void {
-        const { containerEl } = this
+        const { containerEl } = this;
 
-        containerEl.empty()
+        containerEl.empty();
 
-        containerEl.createEl("h2", { text: "Block Reference Counter Settings" })
+        containerEl.createEl("h2", { text: "Block Reference Counter Settings" });
 
         new Setting(containerEl)
             .setName("Display on Parents")
             .setDesc("Display the count of block references on the parent block or header")
             .addToggle((toggle) => {
-                toggle.setValue(getSettings().displayParent)
+                toggle.setValue(getSettings().displayParent);
                 toggle.onChange(async (val) => {
-                    updateSettings({ displayParent: val })
-                    await this.plugin.saveSettings()
-                })
-            })
+                    updateSettings({ displayParent: val });
+                    await this.plugin.saveSettings();
+                });
+            });
         new Setting(containerEl)
             .setName("Display on Children")
             .setDesc("Display the count of block references on the child reference blocks")
             .addToggle((toggle) => {
-                toggle.setValue(getSettings().displayChild)
+                toggle.setValue(getSettings().displayChild);
                 toggle.onChange(async (val) => {
-                    updateSettings({ displayChild: val })
-                    await this.plugin.saveSettings()
-                })
-            })
+                    updateSettings({ displayChild: val });
+                    await this.plugin.saveSettings();
+                });
+            });
         new Setting(containerEl)
             .setName("Type of Reference Table")
             .setDesc("Choose what type of table you'd like references displayed as.")
             .addDropdown((dropdown) => {
-                const { tableType } = getSettings()
-                dropdown.addOption("search", "Search Results Table")
-                dropdown.addOption("basic", "Basic Table")
-                dropdown.setValue(tableType)
+                const { tableType } = getSettings();
+                dropdown.addOption("search", "Search Results Table");
+                dropdown.addOption("basic", "Basic Table");
+                dropdown.setValue(tableType);
                 dropdown.onChange(async (val) => {
-                    updateSettings({ tableType: val })
-                    await this.plugin.saveSettings()
-                    this.plugin.indexDebounce()
-                    this.plugin.previewDebounce()
+                    updateSettings({ tableType: val });
+                    await this.plugin.saveSettings();
+                    this.plugin.indexDebounce();
+                    this.plugin.previewDebounce();
 
-                })
-            })
+                });
+            });
     }
 }
