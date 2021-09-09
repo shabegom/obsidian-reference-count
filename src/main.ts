@@ -1,22 +1,30 @@
 import {
     App,
+    debounce,
     EventRef,
-    Plugin,
-    WorkspaceLeaf,
-    View,
     MarkdownView,
-    TFile,
     Notice,
-} from "obsidian";
-import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types";
-import { indexBlockReferences, getPages, cleanHeader } from "./indexer";
+    Plugin,
+    TFile,
+    View,
+    WorkspaceLeaf
+    } from 'obsidian'
+import {
+    Block,
+    EmbedOrLinkItem,
+    Heading,
+    Reference,
+    Section
+    } from './types'
+import { cleanHeader, getPages, indexBlockReferences } from './indexer'
+import { isEqual } from 'lodash'
+
 import {
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
-} from "./settings";
-import { isEqual } from "lodash";
 
+} from "./settings"
 
 
 /**
@@ -31,7 +39,6 @@ export default class BlockRefCounter extends Plugin {
     private resolved: EventRef
     private typingIndicator: boolean
 
-
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
 
@@ -41,20 +48,32 @@ export default class BlockRefCounter extends Plugin {
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
 
-
         const typingDebounce = debounce(() => {
-            this.typingIndicator = false;
-        }, 500);
+
+            this.typingIndicator = false
+        }, 1000, true)
         this.registerDomEvent(document, "keyup", () => {
             this.typingIndicator = true;
             typingDebounce();
         });
 
-        const indexDebounce = debounce(() => indexBlockReferences(this.app), 5000, true);
-        const indexShortDebounce = debounce(() => indexBlockReferences(this.app), 300);
 
-        const previewDebounce = debounce(() => createPreviewView(this.app), 500, true);
+        const indexDebounce = debounce(
+            () => indexBlockReferences(this.app),
+            5000,
+            true
+        )
+        const indexShortDebounce = debounce(
+            () => indexBlockReferences(this.app),
+            500,
+            true
+        )
 
+        const previewDebounce = debounce(
+            () => createPreviewView(this.app),
+            500,
+            true
+        )
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -63,10 +82,12 @@ export default class BlockRefCounter extends Plugin {
          */
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
-                indexBlockReferences(this.app);
-                createPreviewView(this.app);
-                this.app.metadataCache.offref(this.resolved);
-            });
+
+                this.app.metadataCache.offref(this.resolved)
+                indexBlockReferences(this.app)
+                createPreviewView(this.app)
+            })
+
         } else {
             indexBlockReferences(this.app);
             createPreviewView(this.app);
@@ -91,8 +112,9 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("cache changed, re-indexing");
-                        indexDebounce();
+
+                        indexDebounce()
+
                     }
                 }
             })
@@ -102,8 +124,9 @@ export default class BlockRefCounter extends Plugin {
             this.app.vault.on("delete", () => {
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("file deleted, re-indexing");
-                        indexShortDebounce();
+
+                        indexShortDebounce()
+
                     }
                 }
             })
@@ -118,18 +141,17 @@ export default class BlockRefCounter extends Plugin {
                 previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("layout changed, re-indexing");
-                        indexShortDebounce();
+                        indexShortDebounce()
                     }
                 }
-                const activeLeaf = this.app.workspace.getActiveLeafOfViewType(MarkdownView);
+                const activeLeaf =
+                    this.app.workspace.getActiveLeafOfViewType(MarkdownView)
                 if (activeLeaf) {
                     try {
-                        activeLeaf.previewMode?.renderer.onRendered(
-                            () => {
-                                createPreviewView(this.app);
-                            }
-                        );
+                        activeLeaf.previewMode?.renderer.onRendered(() => {
+                            createPreviewView(this.app)
+                        })
+
                     } catch (e) {
                         console.log(e);
                     }
@@ -139,11 +161,10 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => {
-
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("active leaf changed, re-indexing");
-                        indexShortDebounce();
+
+                        indexShortDebounce()
 
                     }
                 }
@@ -153,19 +174,21 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
-                        console.log("file opened, re-indexing");
-                        indexShortDebounce();
+
+                        indexShortDebounce()
+
                     }
                 }
                 createPreviewView(this.app);
             })
         );
 
-        this.registerMarkdownPostProcessor(async (el, ctx) => {
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+        this.registerMarkdownPostProcessor((el, ctx) => {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+
             if (view) {
                 const path = view.file.path;
                 const sectionInfo = ctx.getSectionInfo(el);
@@ -176,18 +199,17 @@ export default class BlockRefCounter extends Plugin {
                 }
             }
             if (checkForChanges(this.app)) {
-                console.log("markdown-post, re-indexing");
-                indexDebounce();
+
+                indexDebounce()
+
             }
         });
 
-
         //This runs only one time at beginning when Obsidian is completely loaded after startup
-        this.registerEvent(
-            this.app.workspace.on("layout-ready", () => {
-                unloadSearchViews(this.app);
-            })
-        );
+
+        this.app.workspace.onLayoutReady(() => {
+            unloadSearchViews(this.app)
+        })
     }
 
     onunload(): void {
@@ -210,16 +232,9 @@ export default class BlockRefCounter extends Plugin {
  * @param   {App}                   app
  * @return  {void}
  */
-function createPreviewView(
-    app: App,
-): void {
-    let view;
-    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView);
-    if (activeLeaf) {
-        view = activeLeaf.view;
-    } else {
-        view = null;
-    }
+
+function createPreviewView(app: App): void {
+    const view = app.workspace.getActiveViewOfType(MarkdownView)
     if (!view) {
         return;
     }
@@ -228,11 +243,9 @@ function createPreviewView(
     const elements = view.previewMode?.renderer?.sections;
     const page = getPage(sourcePath);
     if (page && elements) {
-        elements.forEach(
-            (section: { el: HTMLElement; lineStart: number }) => {
-                processPage(page, app, section.el, section.lineStart);
-            }
-        );
+        elements.forEach((section: { el: HTMLElement; lineStart: number }) => {
+            processPage(page, app, section.el, section.lineStart)
+        })
     }
 }
 
@@ -268,18 +281,16 @@ function processPage(
                 ) {
                     addBlockReferences(app, el, page.blocks, pageSection);
                 }
-                if (settings.displayParent && page.headings && type === "heading") {
-                    addHeaderReferences(app, el, page.headings, pageSection);
+                if (
+                    settings.displayParent &&
+                    page.headings &&
+                    type === "heading"
+                ) {
+                    addHeaderReferences(app, el, page.headings, pageSection)
                 }
 
                 if (settings.displayChild && page.items) {
-                    addLinkReferences(
-                        app,
-                        el,
-                        page.items,
-                        pageSection,
-                        embeds
-                    );
+                    addLinkReferences(app, el, page.items, pageSection, embeds)
                 }
             }
         });
@@ -355,9 +366,13 @@ function addLinkReferences(
                         embedLink &&
                         // need to delay a bit until the embed is loaded into the view
                         setTimeout(() => {
-                            createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement);
-                        }, 1);
-                });
+                            createButtonElement(
+                                app,
+                                link.reference,
+                                embedLink.firstChild as HTMLElement
+                            )
+                        }, 1)
+                })
             if (link.reference && !link.embed) {
                 createButtonElement(app, link.reference, val);
             }
@@ -374,8 +389,12 @@ function addLinkReferences(
                             item.id === link.reference.key
                         ) {
                             setTimeout(() => {
-                                createButtonElement(app, link.reference, embedLink.firstChild as HTMLElement);
-                            }, 1);
+                                createButtonElement(
+                                    app,
+                                    link.reference,
+                                    embedLink.firstChild as HTMLElement
+                                )
+                            }, 1)
                         }
                     });
                 if (link.reference && !link.embed && item.pos === link.pos) {
@@ -427,11 +446,12 @@ function createButtonElement(
     val: HTMLElement
 ): void {
     if (val) {
-        const count = block && block.references ? block.references.size : 0;
-        const existingButton = val.querySelector("#count");
-        const countEl = createEl("button", { cls: "block-ref-count" });
-        countEl.setAttribute("data-block-ref-id", block.key);
-        countEl.setAttribute("id", "count");
+        const count = block && block.references ? block.references.size : 0
+        const normalizedKey = normalize(block.key)
+        const existingButton = val.querySelector("#count")
+        const countEl = createEl("button", { cls: "block-ref-count" })
+        countEl.setAttribute("data-block-ref-id", block.key)
+        countEl.setAttribute("id", "count")
         if (block.type === "link") {
             countEl.addClass("child-ref");
         } else {
@@ -441,8 +461,10 @@ function createButtonElement(
         const { tableType } = getSettings();
 
         if (tableType === "basic") {
-            const refs = block.references ? Array.from(block.references) : undefined;
-            const refTable: HTMLElement = createTable(app, val, refs);
+            const refs = block.references
+                ? Array.from(block.references)
+                : undefined
+            const refTable: HTMLElement = createTable(app, val, refs)
             countEl.on("click", "button", () => {
                 if (!val.children.namedItem("ref-table")) {
                     block.type === "block" && val.appendChild(refTable);
@@ -457,7 +479,8 @@ function createButtonElement(
         }
         if (tableType === "search") {
             countEl.on("click", "button", async () => {
-                const searchEnabled = app.internalPlugins.getPluginById("global-search").enabled;
+                const searchEnabled =
+                    app.internalPlugins.getPluginById("global-search").enabled
                 if (!searchEnabled) {
                     new Notice("you need to enable the core search plugin");
                 } else {
@@ -472,10 +495,14 @@ function createButtonElement(
                         state: {
                             query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
                         },
-                    });
-                    const search = app.workspace.getLeavesOfType("search-ref");
-                    const searchElement = createSearchElement(app, search, block);
-                    let searchHeight: number;
+                    })
+                    const search = app.workspace.getLeavesOfType("search-ref")
+                    const searchElement = createSearchElement(
+                        app,
+                        search,
+                        block
+                    )
+                    let searchHeight: number
                     if (count === 1) {
                         searchHeight = 225;
                     } else if (count === 2) {
@@ -496,19 +523,21 @@ function createButtonElement(
                     if (!val.children.namedItem("search-ref")) {
                         search[search.length - 1].view.searchQuery;
                         // depending on the type of block the search view needs to be inserted into the DOM at different points
-                        block.type === "block" &&
-                            val.appendChild(searchElement);
-                        block.type === "header" && val.appendChild(searchElement);
-                        block.type === "link" && val.append(searchElement);
+                        block.type === "block" && val.appendChild(searchElement)
+                        block.type === "header" &&
+                            val.appendChild(searchElement)
+                        block.type === "link" && val.append(searchElement)
                     } else {
                         if (val.children.namedItem("search-ref")) {
                             app.workspace
                                 .getLeavesOfType("search-ref")
                                 .forEach((leaf) => {
-                                    const container = leaf.view.containerEl;
-                                    const dataKey = `[data-block-ref-id='${block.key}']`;
+                                    const container = leaf.view.containerEl
+                                    const dataKey = `[data-block-ref-id='${normalizedKey}']`
                                     const key =
-                                        container.parentElement.querySelector(dataKey);
+                                        container.parentElement.querySelector(
+                                            dataKey
+                                        )
                                     if (key) {
                                         leaf.detach();
                                     }
@@ -526,17 +555,18 @@ function createButtonElement(
 }
 
 function createSearchElement(app: App, search: any, block: Block) {
-    const searchElement = search[search.length - 1].view.containerEl;
-    searchElement.setAttribute("data-block-ref-id", block.key);
-    const toolbar = searchElement.querySelector(".nav-buttons-container");
+    const searchElement = search[search.length - 1].view.containerEl
+    const normalizedKey = normalize(block.key)
+    searchElement.setAttribute("data-block-ref-id", normalizedKey)
+    const toolbar = searchElement.querySelector(".nav-buttons-container")
     const closeButton = createEl("button", {
         cls: "search-input-clear-button",
     });
     closeButton.on("click", "button", () => {
         app.workspace.getLeavesOfType("search-ref").forEach((leaf) => {
-            const container = leaf.view.containerEl;
-            const dataKey = `[data-block-ref-id='${block.key}']`;
-            const key = container.parentElement.querySelector(dataKey);
+            const container = leaf.view.containerEl
+            const dataKey = `[data-block-ref-id='${normalizedKey}']`
+            const key = container.parentElement.querySelector(dataKey)
             if (key) {
                 leaf.detach();
             }
@@ -547,35 +577,53 @@ function createSearchElement(app: App, search: any, block: Block) {
     return searchElement;
 }
 
+function createTable(
+    app: App,
+    val: HTMLElement,
+    refs: Reference[]
+): HTMLElement {
+    const refTable = createEl("table", { cls: "ref-table" })
+    refTable.setAttribute("id", "ref-table")
+    const noteHeaderRow = createEl("tr").createEl("th", { text: "Note" })
 
-function createTable(app: App, val: HTMLElement, refs: Reference[]): HTMLElement {
-    const refTable = createEl("table", { cls: "ref-table" });
-    refTable.setAttribute("id", "ref-table");
-    const noteHeaderRow = createEl("tr").appendChild(createEl("th", { text: "Note" }));
-    const lineHeaderRow = createEl("tr").appendChild(createEl("th", { text: "Reference", cls: "reference" }));
-    const removeTable = createEl("button", { text: "x" });
-    removeTable.addClass("table-close");
-    lineHeaderRow.appendChild(removeTable);
-    removeTable.on("click", "button", () => { val.removeChild(refTable); });
-    refTable.appendChild(noteHeaderRow);
-    refTable.appendChild(lineHeaderRow);
-    refTable.appendChild(removeTable);
-    refs && refs.forEach(async (ref) => {
-        const file = await app.vault.getAbstractFileByPath(ref.path) as TFile;
-        const lineContent = await app.vault.cachedRead(file).then(content => content.split("\n")[ref.pos]);
-        const row = createEl("tr");
-        const noteCell = createEl("td");
-        const lineCell = createEl("td");
-        noteCell.appendChild(createEl("a", { cls: "internal-link", href: ref.path, text: ref.basename }));
-        lineCell.appendChild(createEl("span", { text: lineContent }));
-        row.appendChild(noteCell);
-        row.appendChild(lineCell);
-        refTable.appendChild(row);
-    });
-    return refTable;
+    const lineHeaderRow = createEl("tr").createEl("th", {
+        text: "Reference",
+        cls: "reference",
+    })
 
+    const removeTable = createEl("button", { text: "x" })
+    removeTable.addClass("table-close")
+    lineHeaderRow.appendChild(removeTable)
+    removeTable.on("click", "button", () => {
+        val.removeChild(refTable)
+    })
+    refTable.appendChild(noteHeaderRow)
+    refTable.appendChild(lineHeaderRow)
+    refTable.appendChild(removeTable)
+    refs &&
+        refs.forEach(async (ref) => {
+            const file = (await app.vault.getAbstractFileByPath(
+                ref.path
+            )) as TFile
+            const lineContent = await app.vault
+                .cachedRead(file)
+                .then((content) => content.split("\n")[ref.pos])
+            const row = createEl("tr")
+            const noteCell = createEl("td")
+            const lineCell = createEl("td")
+            noteCell.createEl("a", {
+                cls: "internal-link",
+                href: ref.path,
+                text: ref.basename,
+            })
+
+            lineCell.createEl("span", { text: lineContent })
+            row.appendChild(noteCell)
+            row.appendChild(lineCell)
+            refTable.appendChild(row)
+        })
+    return refTable
 }
-
 
 /**
  * if there are block reference buttons in the current view, remove them
@@ -604,36 +652,19 @@ function regexEscape(regexString: string) {
     return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, "\\$1");
 }
 
-// Returns a function, that, as long as it continues to be invoked, will not
-// be triggered. The function will be called after it stops being called for
-// N milliseconds. If `immediate` is passed, trigger the function on the
-// leading edge, instead of the trailing.
-// from: https://davidwalsh.name/javascript-debounce-function
-function debounce(func: () => void, wait: number, immediate?: boolean) {
-    let timeout: ReturnType<typeof setTimeout>;
-    return function (...args: any) {
-        const later = function () {
-            timeout = null;
-            if (!immediate) func.apply(this, ...args);
-        };
-        const callNow = immediate && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-        if (callNow) func.apply(this, ...args);
-    };
-}
 
 //utility function to fetch a specific page from the index
 function getPage(sourcePath: string) {
-    const pages = getPages();
-    return pages[0] &&
+    const pages = getPages()
+    return (
+        pages[0] &&
         getPages().reduce((acc, page) => {
             if (page.file.path === sourcePath) {
                 acc = page;
             }
-            return acc;
-        });
-
+            return acc
+        })
+    )
 }
 
 //get the current active page and compare the cache to what is in the index
@@ -644,12 +675,39 @@ function checkForChanges(app: App) {
         if (activePage) {
             const currentCache = app.metadataCache.getFileCache(activeView.file);
             if (currentCache) {
-                const { links, headings, blocks, embeds } = currentCache;
-                if (!isEqual(activePage.cache.links, links) || !isEqual(activePage.cache.headings, headings) || !isEqual(activePage.cache.blocks, blocks) || !isEqual(activePage.cache.embeds, embeds)) {
-                    return true;
+                const { links, headings, blocks, embeds } = currentCache
+                if (
+                    !isEqual(activePage.cache.links, links) ||
+                    !isEqual(activePage.cache.headings, headings) ||
+                    !isEqual(activePage.cache.blocks, blocks) ||
+                    !isEqual(activePage.cache.embeds, embeds)
+                ) {
+                    return true
                 }
             }
         }
         return false;
     }
+}
+
+const normalize = (str: string) => {
+    return str.replace(/\s+|'/g, "").toLowerCase()
+}
+
+const isEqual = (a: any, b: any) => {
+    if (a === b) return true
+    if (a == null || b == null) return false
+    if (a.constructor !== b.constructor) return false
+    const keys = Object.keys(a)
+    const length = keys.length
+    if (length !== Object.keys(b).length) return false
+    for (let i = 0; i < length; i++) {
+        if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false
+        if (
+            a[keys[i]] === b[keys[i]] ||
+            isEqual(a[keys[i]], b[keys[i]])
+        )
+            return true
+    }
+    return true
 }

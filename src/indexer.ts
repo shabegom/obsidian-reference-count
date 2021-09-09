@@ -1,6 +1,21 @@
-
-import { App, CachedMetadata, EmbedCache, Events, LinkCache, ListItemCache, SectionCache, TFile, parseLinktext } from "obsidian";
-import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types";
+import {
+    App,
+    CachedMetadata,
+    EmbedCache,
+    Events,
+    LinkCache,
+    ListItemCache,
+    parseLinktext,
+    SectionCache,
+    TFile
+    } from 'obsidian'
+import {
+    EmbedOrLinkItem,
+    ListItem,
+    Page,
+    Reference,
+    Section
+    } from './types'
 
 // global index of pages with associated block references
 let pages: Page[] = [];
@@ -26,9 +41,8 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
-    console.time("indexBlockReferences");
-    pages = [];
-    const files = app.vault.getMarkdownFiles();
+    pages = []
+    const files = app.vault.getMarkdownFiles()
     for (const file of files) {
         const cache = app.metadataCache.getFileCache(file);
         if (cache) {
@@ -37,9 +51,8 @@ export function indexBlockReferences(app: App): void {
 
     }
 
-    buildObjects();
-    buildLinksAndEmbeds();
-    console.timeEnd("indexBlockReferences");
+    buildObjects()
+    buildLinksAndEmbeds()
 }
 
 
@@ -151,13 +164,12 @@ function buildObjects(): void {
 
             });
             page.headings && page.headings.forEach((heading) => {
-                const needsCleaning = heading.key.match(/[^\w\s-]/g);
+                const needsCleaning = heading.key.match(/[^\w\s\-']/g)
                 if (needsCleaning) {
                     heading.key = cleanHeader(heading.key);
                 }
                 if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
-
-                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos };
+                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
                     if (!isEquivalent(heading.references, object)) {
                         heading.references = heading.references ? heading.references : new Set();
                         heading.references.add(object);
@@ -191,7 +203,7 @@ function buildLinksAndEmbeds(): void {
         page.items && page.items.forEach(item => {
             const ref = allRefs.find(ref => {
                 if (item.type === "heading") {
-                    const needsCleaning = ref.key.match(/[^\w\s-]/g);
+                    const needsCleaning = ref.key.match(/[^\w\s\-']/g)
                     if (needsCleaning) {
                         ref.key = cleanHeader(ref.key);
                     }
@@ -221,11 +233,13 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
     const foundItems: EmbedOrLinkItem[] = [];
     if (items) {
         items.forEach((item) => {
-            const [note, id] = item.link.split("^");
-            const pos = item.position.start.line;
-            const page = parseLinktext(note).path;
-            const header = item.link.match(/.*#(.*)/);
-            const embed = item.original.match(/^!/) ? true : false;
+
+            const pos = item.position.start.line
+            const parsedLink = parseLinktext(item.link)
+            const page = parsedLink.path
+            const header = parsedLink.subpath
+            const id = header.split("^")[1]
+            const embed = item.original.match(/^!/) ? true : false
             if (id) {
                 foundItems.push(
                     {
@@ -238,10 +252,10 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
                     }
                 );
             }
-            if (header && header[1] && !header[1].startsWith("^")) {
+            if (header && !id) {
                 foundItems.push(
                     {
-                        id: header[1],
+                        id: header.replace("#",""),
                         pos,
                         page,
                         file,
@@ -278,5 +292,7 @@ function isEquivalent(set: Set<Reference>, object: Reference): boolean {
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[(|^\s)(.^\s)]/g, " ").replace(/[^\w\s-]/g, "");
+
+    return header.replace(/[|.]([^\s])/g, " $1").replace(/[^\w\s]/g, "").replace(/\s+/g, " ")
+
 }
