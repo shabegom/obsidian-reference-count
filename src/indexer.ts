@@ -1,6 +1,20 @@
-
-import { App, CachedMetadata, EmbedCache, Events, LinkCache, ListItemCache, SectionCache, TFile, parseLinktext } from "obsidian"
-import { Page, EmbedOrLinkItem, Section, ListItem, Reference } from "./types"
+import {
+    App,
+    CachedMetadata,
+    EmbedCache,
+    LinkCache,
+    ListItemCache,
+    SectionCache,
+    TFile,
+    parseLinktext,
+} from "obsidian"
+import {
+    EmbedOrLinkItem,
+    ListItem,
+    Page,
+    Reference,
+    Section
+} from "./types"
 
 // global index of pages with associated block references
 let pages: Page[] = []
@@ -15,12 +29,11 @@ export function getPages(): Page[] {
     return [...pages]
 }
 
-
 /**
- * Iterate markdown files in the value and builds the pages index with references using metadataCache. 
+ * Iterate markdown files in the value and builds the pages index with references using metadataCache.
  * Completes in ~100ms on a 2000 note vault on first run, and faster on each subsequent run.
  *
- * @param   {App}   app 
+ * @param   {App}   app
  *
  * @return  {void}
  */
@@ -33,13 +46,11 @@ export function indexBlockReferences(app: App): void {
         if (cache) {
             buildPagesArray(file, cache)
         }
-
     }
 
     buildObjects()
     buildLinksAndEmbeds()
 }
-
 
 /**
  * takes in metadataCache items and associated file and pushes the initial page object into the pages array
@@ -52,24 +63,40 @@ export function indexBlockReferences(app: App): void {
  * @param   {ListItemCache[]}    listItems  listItems from metadataCache
  * @param   {TFile}            file       current file being processed
  *
- * @return  {void}                      
+ * @return  {void}
  */
-function buildPagesArray( file: TFile, cache: CachedMetadata): void {
-    const {embeds = [], links = [], headings, blocks, sections, listItems} = cache
-    const blocksArray = blocks && Object.values(blocks).map((block) => ({
-        key: block.id,
-        pos: block.position.start.line,
-        page: file.basename,
-        type: "block"
-    }))
+function buildPagesArray(file: TFile, cache: CachedMetadata): void {
+    const {
+        embeds = [],
+        links = [],
+        headings,
+        blocks,
+        sections,
+        listItems,
+    } = cache
+    const blocksArray =
+        blocks &&
+        Object.values(blocks).map((block) => ({
+            key: block.id,
+            pos: block.position.start.line,
+            page: file.basename,
+            type: "block",
+        }))
 
-    const headingsArray = headings && headings.map((header: { heading: any; position: { start: { line: any } } }) => ({
-        key: header.heading,
-        pos: header.position.start.line,
+    const headingsArray =
+        headings &&
+        headings.map(
+            (header: {
+                heading: string
+                position: { start: { line: number } }
+            }) => ({
+                key: header.heading,
+                pos: header.position.start.line,
 
-        page: file.basename,
-        type: "header"
-    }))
+                page: file.basename,
+                type: "header",
+            })
+        )
     const foundItems = findItems([...embeds, ...links], file)
     const listSections = createListSections(sections, listItems)
 
@@ -80,30 +107,35 @@ function buildPagesArray( file: TFile, cache: CachedMetadata): void {
             blocks: blocksArray,
             file,
             sections: listSections,
-            cache
+            cache,
         })
     }
 }
 
-
 /**
- * If the section is of type list, add the list items from the metadataCache to the section object. 
+ * If the section is of type list, add the list items from the metadataCache to the section object.
  * This makes it easier to iterate a list when building block ref buttons
  *
- * @param   {SectionCache[]}                sections  
- * @param   {ListItemCache[]}               listItems  
+ * @param   {SectionCache[]}                sections
+ * @param   {ListItemCache[]}               listItems
  *
  * @return  {Section[]}                        Array of sections with additional items key
  */
 
-function createListSections(sections: SectionCache[], listItems: ListItemCache[]): Section[] {
-
+function createListSections(
+    sections: SectionCache[],
+    listItems: ListItemCache[]
+): Section[] {
     if (listItems) {
         return sections.map((section) => {
             const items: ListItem[] = []
             if (section.type === "list") {
                 listItems.forEach((item: ListItem) => {
-                    if (item.position.start.line >= section.position.start.line && item.position.start.line <= section.position.end.line) {
+                    if (
+                        item.position.start.line >=
+                            section.position.start.line &&
+                        item.position.start.line <= section.position.end.line
+                    ) {
                         items.push({ pos: item.position.start.line, ...item })
                     }
                 })
@@ -113,10 +145,9 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
             return section
         })
     }
-  
+
     return sections
 }
-
 
 /**
  * Go through every link reference and embed in the vault
@@ -125,7 +156,7 @@ function createListSections(sections: SectionCache[], listItems: ListItemCache[]
  *
  * @param   {Page[]}  pages  Array of pages from global pages index
  *
- * @return  {void}             
+ * @return  {void}
  */
 
 function buildObjects(): void {
@@ -134,40 +165,57 @@ function buildObjects(): void {
         return acc
     }, [])
 
-    pages.forEach(page => {
-        allLinks.forEach(link => {
-            page.blocks && page.blocks.forEach(block => {
-                if (link.type === "block" && link.id === block.key && link.page === block.page) {
-
-                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
-                    if (!isEquivalent(block.references, object)) {
-                        block.references = block.references ? block.references : new Set()
-                        block.references.add(object)
+    pages.forEach((page) => {
+        allLinks.forEach((link) => {
+            page.blocks &&
+                page.blocks.forEach((block) => {
+                    if (
+                        link.type === "block" &&
+                        link.id === block.key &&
+                        link.page === block.page
+                    ) {
+                        const object = {
+                            basename: link.file.basename,
+                            path: link.file.path,
+                            pos: link.pos,
+                        }
+                        if (!isEquivalent(block.references, object)) {
+                            block.references = block.references
+                                ? block.references
+                                : new Set()
+                            block.references.add(object)
+                        }
                     }
+                })
+            page.headings &&
+                page.headings.forEach((heading) => {
+                    const needsCleaning = heading.key.match(/[^\w\s\-'‘‘“”]/g)
+                    if (needsCleaning) {
+                        heading.key = cleanHeader(heading.key)
 
-                }
-
-            })
-            page.headings && page.headings.forEach((heading) => {
-                const needsCleaning = heading.key.match(/[^\w\s\-']/g)
-                if (needsCleaning) {
-                    heading.key = cleanHeader(heading.key)
-                }
-                if (link.type === "heading" && link.id === heading.key && link.page === heading.page) {
-                    const object = { basename: link.file.basename, path: link.file.path, pos: link.pos }
-                    if (!isEquivalent(heading.references, object)) {
-                        heading.references = heading.references ? heading.references : new Set()
-                        heading.references.add(object)
+  
                     }
-
-
-                }
-            })
+                    if (
+                        link.type === "heading" &&
+                        link.id === heading.key &&
+                        link.page === heading.page
+                    ) {
+                        const object = {
+                            basename: link.file.basename,
+                            path: link.file.path,
+                            pos: link.pos,
+                        }
+                        if (!isEquivalent(heading.references, object)) {
+                            heading.references = heading.references
+                                ? heading.references
+                                : new Set()
+                            heading.references.add(object)
+                        }
+                    }
+                })
         })
     })
-
 }
-
 
 /**
  * Go through every block and heading in the vault
@@ -175,7 +223,7 @@ function buildObjects(): void {
  *
  * @param   {Page[]}  pages  Array of pages from global pages index
  *
- * @return  {void}             
+ * @return  {void}
  */
 
 function buildLinksAndEmbeds(): void {
@@ -184,37 +232,47 @@ function buildLinksAndEmbeds(): void {
         page.headings && acc.push(...page.headings)
         return acc
     }, [])
-    pages.forEach(page => {
-        page.items && page.items.forEach(item => {
-            const ref = allRefs.find(ref => {
-                if (item.type === "heading") {
-                    const needsCleaning = ref.key.match(/[^\w\s\-']/g)
-                    if (needsCleaning) {
-                        ref.key = cleanHeader(ref.key)
-                    }
-                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
-                } else {
-                    if (ref.key === item.id && ref.page === item.page) { return true } else { return false }
-                }
-            })
-            item.reference = ref && { ...ref, type: "link" }
+    pages.forEach((page) => {
+        page.items &&
+            page.items.forEach((item) => {
+                const ref = allRefs.find((ref) => {
+                    if (item.type === "heading") {
+                        const needsCleaning = ref.key.match(/[^\w\s\-'‘‘“”]/g)
+                        if (needsCleaning) {
+                            ref.key = cleanHeader(ref.key)
+                        }
+                        if (ref.key === item.id && ref.page === item.page) {
+                            return true
+                        } else {
+                            return false
+                        }
+                    } else {
+                        if (ref.key === item.id && ref.page === item.page) {
+                            return true
+                        } else {
+                            return false
+                        }
 
-        })
+                    }
+                })
+                item.reference = ref && { ...ref, type: "link" }
+            })
     })
 }
-
 
 /**
  * Creates an array of block-id links and embeds that exist in the vault
  *
  * @param   {EmbedCache[] & LinkCache[]}     items  Array of embeds and links
- * @param   {TFile}  file   
+ * @param   {TFile}  file
  *
- * @return  {EmbedOrLinkItem[]}            
+ * @return  {EmbedOrLinkItem[]}
  */
 
-function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkItem[] {
-
+function findItems(
+    items: EmbedCache[] | LinkCache[],
+    file: TFile
+): EmbedOrLinkItem[] {
     const foundItems: EmbedOrLinkItem[] = []
     if (items) {
         items.forEach((item) => {
@@ -225,35 +283,29 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
             const id = header.split("^")[1]
             const embed = item.original.match(/^!/) ? true : false
             if (id) {
-                foundItems.push(
-                    {
-                        id,
-                        pos,
-                        page,
-                        file,
-                        type: "block",
-                        embed,
-                    }
-                )
+                foundItems.push({
+                    id,
+                    pos,
+                    page,
+                    file,
+                    type: "block",
+                    embed,
+                })
             }
             if (header && !id) {
-                foundItems.push(
-                    {
-                        id: header.replace("#",""),
-                        pos,
-                        page,
-                        file,
-                        type: "heading",
-                        embed,
-
-                    }
-                )
+                foundItems.push({
+                    id: header.replace("#", ""),
+                    pos,
+                    page,
+                    file,
+                    type: "heading",
+                    embed,
+                })
             }
         })
     }
 
     return foundItems
-
 }
 
 /**
@@ -267,14 +319,21 @@ function findItems(items: EmbedCache[] | LinkCache[], file: TFile): EmbedOrLinkI
  */
 function isEquivalent(set: Set<Reference>, object: Reference): boolean {
     let equiv = false
-    set && set.forEach((setObject) => {
-        if (setObject.pos === object.pos && setObject.path === object.path) {
-            equiv = true
-        }
-    })
+    set &&
+        set.forEach((setObject) => {
+            if (
+                setObject.pos === object.pos &&
+                setObject.path === object.path
+            ) {
+                equiv = true
+            }
+        })
     return equiv
 }
 
 export function cleanHeader(header: string): string {
-    return header.replace(/[|.]([^\s])/g, " $1").replace(/[^\w\s]/g, "").replace(/\s\s+/g, " ")
+    return header
+        .replace(/[|.]([^\s])/g, " $1")
+        .replace(/[^\w\s\-'‘‘“”]/g, "")
+        .replace(/\s\s+/g, " ")
 }
