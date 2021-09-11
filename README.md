@@ -1,5 +1,5 @@
 # Obsidian Block Reference Counts
-**By shabegom and Murf**
+**By shabegom**
 
 [![](img/brc.png)](https://youtu.be/gxEyKJ0Z7Qs)  
 [Click Here to Watch the Release Video](https://youtu.be/gxEyKJ0Z7Qs)
@@ -14,19 +14,20 @@ Show the amount of references you have in:
 
 Click on the number to open a table with links to the note with the reference and the line the reference appears on.
 
-That's it. That's the plugin.
+There are settings if you want counts to show up on parents, or children, or both. You can also choose to see a basic table, or a fancier search-like view of references.
 
 ## Install
 
-Coming to Community Plugins Soon!  
-
-To install, download `ref-count.zip` in the releases and put the unzipped folder in `.obsidian/plugins`.
+Now available in Community Plugins!
 
 ## Issues
 
-If you run into a bug, please submit an issue. If you have any questions reach out to @shabegom or @Murf on the obsidian Discord.
+If you run into a bug, please submit an issue. If you have any questions reach out to @shabegom on the obsidian Discord.
 
 ## Changelog
+
+**0.1.6**
+- Released in Community Plugins! 🎉
 
 **0.0.9**
 - Cleanup search view on unload
