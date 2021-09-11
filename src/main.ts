@@ -35,8 +35,6 @@ export default class BlockRefCounter extends Plugin {
 
         await this.loadSettings();
 
-        unloadSearchViews(this.app);
-
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
 
         const typingDebounce = debounce(

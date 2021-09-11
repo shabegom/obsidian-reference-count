@@ -71,8 +71,6 @@ export class BlockRefCountSettingTab extends PluginSettingTab {
                 dropdown.onChange(async (val) => {
                     updateSettings({ tableType: val });
                     await this.plugin.saveSettings();
-                    this.plugin.indexDebounce();
-                    this.plugin.previewDebounce();
 
                 });
             });
