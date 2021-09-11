@@ -7,7 +7,8 @@ import {
     MarkdownView,
     TFile,
     Notice,
-    debounce
+    debounce,
+    Constructor,
 } from "obsidian"
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types"
 import { indexBlockReferences, getPages, cleanHeader } from "./indexer"
@@ -164,7 +165,7 @@ export default class BlockRefCounter extends Plugin {
         )
 
         this.registerMarkdownPostProcessor((el, ctx) => {
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView as unknown as Constructor<View>)
             if (view) {
                 const path = view.file.path
                 const sectionInfo = ctx.getSectionInfo(el)
@@ -190,11 +191,11 @@ export default class BlockRefCounter extends Plugin {
         unloadButtons(this.app)
         unloadSearchViews(this.app)
     }
-    async loadSettings() {
+    async loadSettings(): Promise<void>{
         const newSettings = await this.loadData()
         updateSettings(newSettings)
     }
-    async saveSettings() {
+    async saveSettings(): Promise<void>{
         await this.saveData(getSettings())
     }
 }
@@ -206,7 +207,7 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 function createPreviewView(app: App): void {
-    const view = app.workspace.getActiveViewOfType(MarkdownView)
+    const view = app.workspace.getActiveViewOfType(MarkdownView as unknown as Constructor<View>)
     if (!view) {
         return
     }
@@ -276,7 +277,7 @@ function processPage(
  * @param   {App}                      app
  * @param   {HTMLElement}              val      the HTMLElement to attach the button to
  * @param   {Block[]}                  blocks   Array of blocks from pages index
- * @param   {Section}                  section  Section object from pages indext
+ * @param   {Section}                  section  Section object from pages index
  *
  * @return  {void}
  */
@@ -526,7 +527,9 @@ function createButtonElement(
     }
 }
 
-function createSearchElement(app: App, search: any, block: Block) {
+
+
+function createSearchElement(app: App, search: WorkspaceLeaf[], block: Block) {
     const searchElement = search[search.length - 1].view.containerEl
     const normalizedKey = normalize(block.key)
     searchElement.setAttribute("data-block-ref-id", normalizedKey)
@@ -607,7 +610,7 @@ function createTable(
  */
 function unloadButtons(app: App): void {
     let buttons
-    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView)
+    const activeLeaf = app.workspace.getActiveViewOfType(MarkdownView as unknown as Constructor<View>)
     if (activeLeaf) {
         buttons = activeLeaf.containerEl.querySelectorAll("#count")
     }
@@ -641,7 +644,7 @@ function getPage(sourcePath: string) {
 
 //get the current active page and compare the cache to what is in the index
 function checkForChanges(app: App) {
-    const activeView = app.workspace.getActiveViewOfType(MarkdownView)
+    const activeView = app.workspace.getActiveViewOfType(MarkdownView as unknown as Constructor<View>)
     if (activeView) {
         const activePage = getPage(activeView.file.path)
         if (activePage) {
@@ -666,6 +669,7 @@ const normalize = (str: string) => {
     return str.replace(/\s+|'/g, "").toLowerCase()
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isEqual = (a: any, b: any) => {
     if (a === b) return true
     if (a == null || b == null) return false
