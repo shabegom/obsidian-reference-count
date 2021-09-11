@@ -7,14 +7,14 @@ import {
     SectionCache,
     TFile,
     parseLinktext,
-} from "obsidian"
+} from "obsidian";
 import {
     EmbedOrLinkItem,
     ListItem,
     Page,
     Reference,
     Section
-} from "./types"
+} from "./types";
 
 // global index of pages with associated block references
 let pages: Page[] = [];
@@ -39,8 +39,8 @@ export function getPages(): Page[] {
  */
 
 export function indexBlockReferences(app: App): void {
-    pages = []
-    const files = app.vault.getMarkdownFiles()
+    pages = [];
+    const files = app.vault.getMarkdownFiles();
     for (const file of files) {
         const cache = app.metadataCache.getFileCache(file);
         if (cache) {
@@ -48,8 +48,8 @@ export function indexBlockReferences(app: App): void {
         }
     }
 
-    buildObjects()
-    buildLinksAndEmbeds()
+    buildObjects();
+    buildLinksAndEmbeds();
 }
 
 /**
@@ -73,7 +73,7 @@ function buildPagesArray(file: TFile, cache: CachedMetadata): void {
         blocks,
         sections,
         listItems,
-    } = cache
+    } = cache;
     const blocksArray =
         blocks &&
         Object.values(blocks).map((block) => ({
@@ -81,7 +81,7 @@ function buildPagesArray(file: TFile, cache: CachedMetadata): void {
             pos: block.position.start.line,
             page: file.basename,
             type: "block",
-        }))
+        }));
 
     const headingsArray =
         headings &&
@@ -96,9 +96,9 @@ function buildPagesArray(file: TFile, cache: CachedMetadata): void {
                 page: file.basename,
                 type: "header",
             })
-        )
-    const foundItems = findItems([...embeds, ...links], file)
-    const listSections = createListSections(sections, listItems)
+        );
+    const foundItems = findItems([...embeds, ...links], file);
+    const listSections = createListSections(sections, listItems);
 
     if (foundItems) {
         pages.push({
@@ -108,7 +108,7 @@ function buildPagesArray(file: TFile, cache: CachedMetadata): void {
             file,
             sections: listSections,
             cache,
-        })
+        });
     }
 }
 
@@ -136,7 +136,7 @@ function createListSections(
                             section.position.start.line &&
                         item.position.start.line <= section.position.end.line
                     ) {
-                        items.push({ pos: item.position.start.line, ...item })
+                        items.push({ pos: item.position.start.line, ...item });
                     }
                 });
                 const sectionWithItems = { items, ...section };
@@ -146,7 +146,7 @@ function createListSections(
         });
     }
 
-    return sections
+    return sections;
 }
 
 /**
@@ -178,20 +178,20 @@ function buildObjects(): void {
                             basename: link.file.basename,
                             path: link.file.path,
                             pos: link.pos,
-                        }
+                        };
                         if (!isEquivalent(block.references, object)) {
                             block.references = block.references
                                 ? block.references
-                                : new Set()
-                            block.references.add(object)
+                                : new Set();
+                            block.references.add(object);
                         }
                     }
-                })
+                });
             page.headings &&
                 page.headings.forEach((heading) => {
-                    const needsCleaning = heading.key.match(/[^\w\s\-'‘‘“”]/g)
+                    const needsCleaning = heading.key.match(/[^\w\s\-'‘‘“”]/g);
                     if (needsCleaning) {
-                        heading.key = cleanHeader(heading.key)
+                        heading.key = cleanHeader(heading.key);
 
   
                     }
@@ -204,17 +204,17 @@ function buildObjects(): void {
                             basename: link.file.basename,
                             path: link.file.path,
                             pos: link.pos,
-                        }
+                        };
                         if (!isEquivalent(heading.references, object)) {
                             heading.references = heading.references
                                 ? heading.references
-                                : new Set()
-                            heading.references.add(object)
+                                : new Set();
+                            heading.references.add(object);
                         }
                     }
-                })
-        })
-    })
+                });
+        });
+    });
 }
 
 /**
@@ -228,36 +228,36 @@ function buildObjects(): void {
 
 function buildLinksAndEmbeds(): void {
     const allRefs = pages.reduce((acc, page) => {
-        page.blocks && acc.push(...page.blocks)
-        page.headings && acc.push(...page.headings)
-        return acc
-    }, [])
+        page.blocks && acc.push(...page.blocks);
+        page.headings && acc.push(...page.headings);
+        return acc;
+    }, []);
     pages.forEach((page) => {
         page.items &&
             page.items.forEach((item) => {
                 const ref = allRefs.find((ref) => {
                     if (item.type === "heading") {
-                        const needsCleaning = ref.key.match(/[^\w\s\-'‘‘“”]/g)
+                        const needsCleaning = ref.key.match(/[^\w\s\-'‘‘“”]/g);
                         if (needsCleaning) {
-                            ref.key = cleanHeader(ref.key)
+                            ref.key = cleanHeader(ref.key);
                         }
                         if (ref.key === item.id && ref.page === item.page) {
-                            return true
+                            return true;
                         } else {
-                            return false
+                            return false;
                         }
                     } else {
                         if (ref.key === item.id && ref.page === item.page) {
-                            return true
+                            return true;
                         } else {
-                            return false
+                            return false;
                         }
 
                     }
-                })
-                item.reference = ref && { ...ref, type: "link" }
-            })
-    })
+                });
+                item.reference = ref && { ...ref, type: "link" };
+            });
+    });
 }
 
 /**
@@ -273,16 +273,16 @@ function findItems(
     items: EmbedCache[] | LinkCache[],
     file: TFile
 ): EmbedOrLinkItem[] {
-    const foundItems: EmbedOrLinkItem[] = []
+    const foundItems: EmbedOrLinkItem[] = [];
     if (items) {
         items.forEach((item) => {
 
-            const pos = item.position.start.line
-            const parsedLink = parseLinktext(item.link)
-            const page = parsedLink.path
-            const header = parsedLink.subpath
-            const id = header.split("^")[1]
-            const embed = item.original.match(/^!/) ? true : false
+            const pos = item.position.start.line;
+            const parsedLink = parseLinktext(item.link);
+            const page = parsedLink.path;
+            const header = parsedLink.subpath;
+            const id = header.split("^")[1];
+            const embed = item.original.match(/^!/) ? true : false;
             if (id) {
                 foundItems.push({
                     id,
@@ -291,7 +291,7 @@ function findItems(
                     file,
                     type: "block",
                     embed,
-                })
+                });
             }
             if (header && !id) {
                 foundItems.push({
@@ -301,12 +301,12 @@ function findItems(
                     file,
                     type: "heading",
                     embed,
-                })
+                });
             }
         });
     }
 
-    return foundItems
+    return foundItems;
 }
 
 /**
@@ -319,22 +319,22 @@ function findItems(
  * @return  {boolean}             true if object exists in Set
  */
 function isEquivalent(set: Set<Reference>, object: Reference): boolean {
-    let equiv = false
+    let equiv = false;
     set &&
         set.forEach((setObject) => {
             if (
                 setObject.pos === object.pos &&
                 setObject.path === object.path
             ) {
-                equiv = true
+                equiv = true;
             }
-        })
-    return equiv
+        });
+    return equiv;
 }
 
 export function cleanHeader(header: string): string {
     return header
         .replace(/[|.]([^\s])/g, " $1")
         .replace(/[^\w\s\-'‘‘“”]/g, "")
-        .replace(/\s\s+/g, " ")
+        .replace(/\s\s+/g, " ");
 }

@@ -9,7 +9,7 @@ import {
     Pos,
     SectionCache,
     TFile,
-} from "obsidian"
+} from "obsidian";
 
 declare module "obsidian" {
     interface App {
