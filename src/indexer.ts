@@ -192,6 +192,8 @@ function buildObjects(): void {
                     const needsCleaning = heading.key.match(/[^\w\s\-'‘‘“”]/g)
                     if (needsCleaning) {
                         heading.key = cleanHeader(heading.key)
+
+  
                     }
                     if (
                         link.type === "heading" &&
@@ -250,6 +252,7 @@ function buildLinksAndEmbeds(): void {
                         } else {
                             return false
                         }
+
                     }
                 })
                 item.reference = ref && { ...ref, type: "link" }
