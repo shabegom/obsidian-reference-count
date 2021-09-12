@@ -8,13 +8,7 @@ import {
     TFile,
     parseLinktext,
 } from "obsidian";
-import {
-    EmbedOrLinkItem,
-    ListItem,
-    Page,
-    Reference,
-    Section
-} from "./types";
+import { EmbedOrLinkItem, ListItem, Page, Reference, Section } from "./types";
 
 // global index of pages with associated block references
 let pages: Page[] = [];
@@ -192,8 +186,6 @@ function buildObjects(): void {
                     const needsCleaning = heading.key.match(/[^\w\s\-'‘‘“”]/g);
                     if (needsCleaning) {
                         heading.key = cleanHeader(heading.key);
-
-  
                     }
                     if (
                         link.type === "heading" &&
@@ -252,7 +244,6 @@ function buildLinksAndEmbeds(): void {
                         } else {
                             return false;
                         }
-
                     }
                 });
                 item.reference = ref && { ...ref, type: "link" };
@@ -276,10 +267,9 @@ function findItems(
     const foundItems: EmbedOrLinkItem[] = [];
     if (items) {
         items.forEach((item) => {
-
             const pos = item.position.start.line;
             const parsedLink = parseLinktext(item.link);
-            const page = parsedLink.path;
+            const page = parsedLink.path || file.path.replace(".md", "");
             const header = parsedLink.subpath;
             const id = header.split("^")[1];
             const embed = item.original.match(/^!/) ? true : false;
