@@ -10,6 +10,7 @@ import {
 } from "obsidian";
 import { EmbedOrLinkItem, ListItem, Page, Reference, Section } from "./types";
 
+
 // global index of pages with associated block references
 let pages: Page[] = [];
 
@@ -23,6 +24,11 @@ export function getPages(): Page[] {
     return [...pages];
 }
 
+export function setPages(newPages: Page[]): void {
+    pages = newPages;
+}
+
+
 /**
  * Iterate markdown files in the value and builds the pages index with references using metadataCache.
  * Completes in ~100ms on a 2000 note vault on first run, and faster on each subsequent run.
@@ -32,19 +38,29 @@ export function getPages(): Page[] {
  * @return  {void}
  */
 
-export function indexBlockReferences(app: App): void {
-    pages = [];
-    const files = app.vault.getMarkdownFiles();
-    for (const file of files) {
-        const cache = app.metadataCache.getFileCache(file);
-        if (cache) {
-            buildPagesArray(file, cache);
+export function indexBlockReferences(app: App): Promise<> {
+    return new Promise((resolve) => {
+        pages = [];
+        const files = app.vault.getMarkdownFiles();
+        for (const file of files) {
+            const cache = app.metadataCache.getFileCache(file);
+            if (cache) {
+                const cleanFile = {path: file.path, basename: file.basename};
+                 buildPagesArray(cleanFile, cache); 
+            }
         }
-    }
+        resolve(pages);
+    });
+}
 
+
+export const buildIndex = (pages): void => {  
+    setPages(pages)
     buildObjects();
     buildLinksAndEmbeds();
-}
+    return pages
+};
+
 
 /**
  * takes in metadataCache items and associated file and pushes the initial page object into the pages array

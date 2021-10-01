@@ -11,12 +11,14 @@ import {
     TFile,
 } from "obsidian";
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types";
-import { indexBlockReferences, getPages, cleanHeader } from "./indexer";
+import { indexBlockReferences, getPages, cleanHeader, setPages} from "./indexer";
 import {
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
 } from "./settings";
+import IndexWebWorker from "web-worker:./IndexWorker.ts";
+
 
 /**
  * BlockRefCounter Plugin
@@ -32,16 +34,30 @@ export default class BlockRefCounter extends Plugin {
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
-
         await this.loadSettings();
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
+
+        const index = (): Promise<void> => {
+            return new Promise((resolve) => {
+                const worker = new IndexWebWorker();
+                indexBlockReferences(this.app).then((pages) => {
+                    worker.postMessage({pages});
+                    worker.onmessage = (e) => {
+                        setPages(e.data.pages);
+                        worker.terminate();
+                        resolve();
+                    };
+                });
+            
+            });
+        };
 
         const typingDebounce = debounce(
             () => {
                 this.typingIndicator = false;
             },
-            1000,
+            50,
             true
         );
         this.registerDomEvent(document, "keyup", () => {
@@ -50,19 +66,23 @@ export default class BlockRefCounter extends Plugin {
         });
 
         const indexDebounce = debounce(
-            () => indexBlockReferences(this.app),
-            5000,
+            () => {
+                index()
+            },
+            100,
             true
         );
         const indexShortDebounce = debounce(
-            () => indexBlockReferences(this.app),
-            500,
+            () => {
+                index()
+            },
+            50,
             true
         );
 
         const previewDebounce = debounce(
             () => createPreviewView(this.app),
-            500,
+            100,
             true
         );
 
@@ -74,12 +94,15 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 this.app.metadataCache.offref(this.resolved);
-                indexBlockReferences(this.app);
-                createPreviewView(this.app);
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
+                
             });
         } else {
-            indexBlockReferences(this.app);
-            createPreviewView(this.app);
+            index().then(() => {
+                createPreviewView(this.app);
+            });
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {

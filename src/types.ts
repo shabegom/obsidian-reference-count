@@ -90,9 +90,9 @@ export interface Index {
 export interface EmbedOrLinkItem {
     id: string
     pos: number
-    file: TFile
     page: string
     type: string
+    file: {path: string, basename: string}
     embed: boolean
     reference?: Block | Heading
 }
