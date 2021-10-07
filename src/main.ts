@@ -11,14 +11,18 @@ import {
     TFile,
 } from "obsidian";
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types";
-import { indexBlockReferences, getPages, cleanHeader, setPages} from "./indexer";
+import {
+    indexBlockReferences,
+    getPages,
+    cleanHeader,
+    setPages,
+} from "./indexer";
 import {
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
 } from "./settings";
 import IndexWebWorker from "web-worker:./IndexWorker.ts";
-
 
 /**
  * BlockRefCounter Plugin
@@ -42,14 +46,13 @@ export default class BlockRefCounter extends Plugin {
             return new Promise((resolve) => {
                 const worker = new IndexWebWorker();
                 indexBlockReferences(this.app).then((pages) => {
-                    worker.postMessage({pages});
+                    worker.postMessage({ pages });
                     worker.onmessage = (e) => {
                         setPages(e.data.pages);
                         worker.terminate();
                         resolve();
                     };
                 });
-            
             });
         };
 
@@ -57,7 +60,7 @@ export default class BlockRefCounter extends Plugin {
             () => {
                 this.typingIndicator = false;
             },
-            50,
+            100,
             true
         );
         this.registerDomEvent(document, "keyup", () => {
@@ -67,24 +70,23 @@ export default class BlockRefCounter extends Plugin {
 
         const indexDebounce = debounce(
             () => {
-                index()
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
             },
             100,
             true
         );
         const indexShortDebounce = debounce(
             () => {
-                index()
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
             },
             50,
             true
         );
 
-        const previewDebounce = debounce(
-            () => createPreviewView(this.app),
-            100,
-            true
-        );
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -97,7 +99,6 @@ export default class BlockRefCounter extends Plugin {
                 index().then(() => {
                     createPreviewView(this.app);
                 });
-                
             });
         } else {
             index().then(() => {
@@ -121,7 +122,6 @@ export default class BlockRefCounter extends Plugin {
          */
         this.registerEvent(
             this.app.metadataCache.on("changed", () => {
-                previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexDebounce();
@@ -146,7 +146,6 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexShortDebounce();
@@ -173,18 +172,12 @@ export default class BlockRefCounter extends Plugin {
                         indexShortDebounce();
                     }
                 }
-                createPreviewView(this.app);
             })
         );
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexShortDebounce();
-                    }
-                }
-                createPreviewView(this.app);
+                indexShortDebounce();
             })
         );
 
@@ -681,18 +674,12 @@ function checkForChanges(app: App) {
         if (activePage) {
             const currentCache = app.metadataCache.getFileCache(activeView.file);
             if (currentCache) {
-                const { links, headings, blocks, embeds } = currentCache;
-                if (
-                    !isEqual(activePage.cache.links, links) ||
-                    !isEqual(activePage.cache.headings, headings) ||
-                    !isEqual(activePage.cache.blocks, blocks) ||
-                    !isEqual(activePage.cache.embeds, embeds)
-                ) {
-                    return true;
+                if (isEqual(activePage.cache, currentCache)) {
+                    return false;
                 }
             }
         }
-        return false;
+        return true;
     }
 }
 

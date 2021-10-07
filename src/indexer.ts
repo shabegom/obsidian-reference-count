@@ -46,7 +46,7 @@ export function indexBlockReferences(app: App): Promise<> {
             const cache = app.metadataCache.getFileCache(file);
             if (cache) {
                 const cleanFile = {path: file.path, basename: file.basename};
-                 buildPagesArray(cleanFile, cache); 
+                buildPagesArray(cleanFile, cache); 
             }
         }
         resolve(pages);
@@ -55,10 +55,10 @@ export function indexBlockReferences(app: App): Promise<> {
 
 
 export const buildIndex = (pages): void => {  
-    setPages(pages)
+    setPages(pages);
     buildObjects();
     buildLinksAndEmbeds();
-    return pages
+    return pages;
 };
 
 
