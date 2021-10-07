@@ -1,10 +1,10 @@
 {
-  "id": "block-reference-count",
-  "name": "Block Reference Counter",
-  "version": "0.1.7",
-  "minAppVersion": "0.12.3",
-  "description": "Shows the count of block references next to the block-id",
-  "author": "shabegom",
-  "authorUrl": "https://shbgm.ca",
-  "isDesktopOnly": false
+    "id": "block-reference-count",
+    "name": "Block Reference Counter",
+    "version": "0.2.0",
+    "minAppVersion": "0.12.3",
+    "description": "Shows the count of block references next to the block-id",
+    "author": "shabegom",
+    "authorUrl": "https://shbgm.ca",
+    "isDesktopOnly": false
 }
