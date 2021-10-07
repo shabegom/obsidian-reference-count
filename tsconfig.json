@@ -18,5 +18,5 @@
   },
   "include": [
     "**/*.ts"
-  ]
+, "src/IndexWorker.ts"  ]
 }

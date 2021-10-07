@@ -11,12 +11,18 @@ import {
     TFile,
 } from "obsidian";
 import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types";
-import { indexBlockReferences, getPages, cleanHeader } from "./indexer";
+import {
+    indexBlockReferences,
+    getPages,
+    cleanHeader,
+    setPages,
+} from "./indexer";
 import {
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
 } from "./settings";
+import IndexWebWorker from "web-worker:./IndexWorker.ts";
 
 /**
  * BlockRefCounter Plugin
@@ -32,16 +38,29 @@ export default class BlockRefCounter extends Plugin {
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
-
         await this.loadSettings();
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
+
+        const index = (): Promise<void> => {
+            return new Promise((resolve) => {
+                const worker = new IndexWebWorker();
+                indexBlockReferences(this.app).then((pages) => {
+                    worker.postMessage({ pages });
+                    worker.onmessage = (e) => {
+                        setPages(e.data.pages);
+                        worker.terminate();
+                        resolve();
+                    };
+                });
+            });
+        };
 
         const typingDebounce = debounce(
             () => {
                 this.typingIndicator = false;
             },
-            1000,
+            100,
             true
         );
         this.registerDomEvent(document, "keyup", () => {
@@ -50,21 +69,24 @@ export default class BlockRefCounter extends Plugin {
         });
 
         const indexDebounce = debounce(
-            () => indexBlockReferences(this.app),
-            5000,
+            () => {
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
+            },
+            100,
             true
         );
         const indexShortDebounce = debounce(
-            () => indexBlockReferences(this.app),
-            500,
+            () => {
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
+            },
+            50,
             true
         );
 
-        const previewDebounce = debounce(
-            () => createPreviewView(this.app),
-            500,
-            true
-        );
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -74,12 +96,14 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 this.app.metadataCache.offref(this.resolved);
-                indexBlockReferences(this.app);
-                createPreviewView(this.app);
+                index().then(() => {
+                    createPreviewView(this.app);
+                });
             });
         } else {
-            indexBlockReferences(this.app);
-            createPreviewView(this.app);
+            index().then(() => {
+                createPreviewView(this.app);
+            });
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -98,7 +122,6 @@ export default class BlockRefCounter extends Plugin {
          */
         this.registerEvent(
             this.app.metadataCache.on("changed", () => {
-                previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexDebounce();
@@ -123,7 +146,6 @@ export default class BlockRefCounter extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                previewDebounce();
                 if (!this.typingIndicator) {
                     if (checkForChanges(this.app)) {
                         indexShortDebounce();
@@ -150,18 +172,12 @@ export default class BlockRefCounter extends Plugin {
                         indexShortDebounce();
                     }
                 }
-                createPreviewView(this.app);
             })
         );
 
         this.registerEvent(
             this.app.workspace.on("file-open", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexShortDebounce();
-                    }
-                }
-                createPreviewView(this.app);
+                indexShortDebounce();
             })
         );
 
@@ -658,18 +674,12 @@ function checkForChanges(app: App) {
         if (activePage) {
             const currentCache = app.metadataCache.getFileCache(activeView.file);
             if (currentCache) {
-                const { links, headings, blocks, embeds } = currentCache;
-                if (
-                    !isEqual(activePage.cache.links, links) ||
-                    !isEqual(activePage.cache.headings, headings) ||
-                    !isEqual(activePage.cache.blocks, blocks) ||
-                    !isEqual(activePage.cache.embeds, embeds)
-                ) {
-                    return true;
+                if (isEqual(activePage.cache, currentCache)) {
+                    return false;
                 }
             }
         }
-        return false;
+        return true;
     }
 }
 
