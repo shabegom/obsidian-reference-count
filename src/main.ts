@@ -179,57 +179,22 @@ export default class BlockRefCounter extends Plugin {
             // })
         // );
 //
-        // this.registerMarkdownPostProcessor((el, ctx) => {
-            // const view = this.app.workspace.getActiveViewOfType(
-                // MarkdownView as unknown as Constructor<View>
-            // );
-            // if (view) {
-                // const path = view.file.path;
-                // const sectionInfo = ctx.getSectionInfo(el);
-                // const lineStart = sectionInfo && sectionInfo.lineStart;
-                // const page = getPage(path);
-                // if (page && lineStart) {
-                    // processPage(page, this.app, el, lineStart);
-                // }
-            // }
-            // if (checkForChanges(this.app)) {
-                // indexDebounce();
-            // }
-        // });
+        this.registerMarkdownPostProcessor((el, ctx) => {
+            const view = this.app.workspace.getActiveViewOfType(
+                MarkdownView as unknown as Constructor<View>
+            );
+            if (view) {
+                const sectionInfo = ctx.getSectionInfo(el);
+                const lineStart = sectionInfo && sectionInfo.lineStart;
+                const page = getCurrentPage(view.file, this.app)
+                if (page && lineStart) {
+                    processPage(page, this.app, el, lineStart);
+                }
+            }
+        });
 //
 //        This runs only one time at beginning when Obsidian is completely loaded after startup
 //
-        this.registerEvent(this.app.workspace.on("file-open", file => {
-            const path = file.path.replace(/\/|\s/g, '-')
-            const cache = this.app.metadataCache.getFileCache(file)
-            const references = this.app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
-                const key = link.reference.link
-                if (!acc[key]) {
-                    acc[key] = []
-                }
-                if (acc[key]) {
-                    acc[key].push(link)
-                }
-                return acc
-            }, {})
-            const links = this.app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
-                const key = link.sourceFile.path.replace(/\/|\s/g, '-')
-                const reference = link.reference.link
-                if (!acc[key]) {
-                    acc[key] = {}
-                }
-                if (!acc[key][reference]) {
-                    acc[key][reference] = {}
-                }
-                acc[key][reference] = references[reference]
-                return acc
-            }, {})
-            const currentPage = links[path]
-            currentPage.cache = cache
-            createPreviewView(currentPage, this.app)
-            console.log(currentPage)
-
-        }))
         this.app.workspace.onLayoutReady(() => {
             unloadSearchViews(this.app);
         });
@@ -266,6 +231,7 @@ function createPreviewView(page, app: App): void {
     const sourcePath = view.file?.path;
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections;
+    console.log(page, elements)
     if (page && elements) {
         elements.forEach((section: { el: HTMLElement; lineStart: number }) => {
             processPage(page, app, section.el, section.lineStart);
@@ -275,9 +241,11 @@ function createPreviewView(page, app: App): void {
 
 function processPage(
     page: {
+        cache: {
         sections: Section[]
         blocks: Block[]
         headings: Heading[]
+        },
         items: EmbedOrLinkItem[]
     },
     app: App,
@@ -285,8 +253,8 @@ function processPage(
     start: number
 ) {
     const settings = getSettings();
-    if (page.sections) {
-        page.sections.forEach((pageSection: Section) => {
+    if (page.cache.sections) {
+        page.cache.sections.forEach((pageSection: Section) => {
             if (pageSection.position.start.line === start) {
                 pageSection.pos = pageSection.position.start.line;
                 const type = pageSection?.type;
@@ -296,21 +264,21 @@ function processPage(
                 const hasEmbed = embeds.length > 0 ? true : false;
                 if (
                     (settings.displayParent &&
-                        page.blocks &&
+                        page.cache.blocks &&
                         !hasEmbed &&
                         type === "paragraph") ||
                     type === "list" ||
                     type === "blockquote" ||
                     type === "code"
                 ) {
-                    addBlockReferences(app, el, page.blocks, pageSection);
+                    addBlockReferences(app, el, page.cache.blocks, pageSection);
                 }
                 if (
                     settings.displayParent &&
-                    page.headings &&
+                    page.cache.headings &&
                     type === "heading"
                 ) {
-                    addHeaderReferences(app, el, page.headings, pageSection);
+                    addHeaderReferences(app, el, page.cache.headings, pageSection);
                 }
 
                 if (settings.displayChild && page.items) {
@@ -469,8 +437,9 @@ function createButtonElement(
     block: Block | Heading,
     val: HTMLElement
 ): void {
+console.log('creating button')
     if (val) {
-        const count = block && block.references ? block.references.size : 0;
+        const count = block && block.references ? block.references.length : 0;
         const normalizedKey = normalize(block.key);
         const existingButton = val.querySelector("#count");
         const countEl = createEl("button", { cls: "block-ref-count" });
@@ -730,3 +699,85 @@ const isEqual = (a: any, b: any) => {
     }
     return true;
 };
+
+function createListSections(
+    sections: SectionCache[],
+    listItems: ListItemCache[]
+): Section[] {
+    if (listItems) {
+        return sections.map((section) => {
+            const items: ListItem[] = [];
+            if (section.type === "list") {
+                listItems.forEach((item: ListItem) => {
+                    if (
+                        item.position.start.line >=
+                            section.position.start.line &&
+                        item.position.start.line <= section.position.end.line
+                    ) {
+                        items.push({ pos: item.position.start.line, ...item });
+                    }
+                });
+                const sectionWithItems = { items, ...section };
+                return sectionWithItems;
+            }
+            return section;
+        });
+    }
+
+    return sections;
+}
+function getCurrentPage(file, app) {
+            const path = file.path.replace(/\/|\s/g, '-')
+            const cache = app.metadataCache.getFileCache(file)
+            const transformedCache = {...cache}
+            const references = app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
+                const key = link.reference.link
+                if (!acc[key]) {
+                    acc[key] = []
+                }
+                if (acc[key]) {
+                    acc[key].push(link)
+                }
+                return acc
+            }, {})
+        if (cache.blocks) {
+        transformedCache.blocks = Object.values(cache.blocks).map((block) => ({
+            key: block.id,
+            pos: block.position.start.line,
+            page: file.basename,
+            type: "block",
+            references: references[`${file.basename}#^${block.id}`]
+        }));
+            }
+        if (cache.headings) {
+
+        transformedCache.headings = cache.headings.map(
+            (header: {
+                heading: string
+                position: { start: { line: number } }
+            }) => ({
+                key: header.heading,
+                pos: header.position.start.line,
+
+                page: file.basename,
+                type: "header",
+                references: references[`${file.basename}#${header.heading}`]         })
+                )
+            }
+            if (cache.sections) {
+                transformedCache.sections = createListSections(cache.sections, cache.listItems)
+            }
+            const links = app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
+                const key = link.sourceFile.path.replace(/\/|\s/g, '-')
+                const reference = link.reference.link
+                if (!acc[key]) {
+                    acc[key] = {items: {}}
+                } 
+                acc[key]['items'][reference] = references[reference]
+                return acc
+            }, {})
+            const currentPage = links[path]
+            currentPage.cache = transformedCache
+            return currentPage
+
+        }
