@@ -22,7 +22,7 @@ import {
     getSettings,
     updateSettings,
 } from "./settings";
-import IndexWebWorker from "web-worker:./IndexWorker.ts";
+//import IndexWebWorker from "web-worker:./IndexWorker.ts";
 
 /**
  * BlockRefCounter Plugin
@@ -42,19 +42,19 @@ export default class BlockRefCounter extends Plugin {
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
 
-        const index = (): Promise<void> => {
-            return new Promise((resolve) => {
-                const worker = new IndexWebWorker();
-                indexBlockReferences(this.app).then((pages) => {
-                    worker.postMessage({ pages });
-                    worker.onmessage = (e) => {
-                        setPages(e.data.pages);
-                        worker.terminate();
-                        resolve();
-                    };
-                });
-            });
-        };
+        // const index = (): Promise<void> => {
+            // return new Promise((resolve) => {
+                // const worker = new IndexWebWorker();
+                // indexBlockReferences(this.app).then((pages) => {
+                    // worker.postMessage({ pages });
+                    // worker.onmessage = (e) => {
+                        // setPages(e.data.pages);
+                        // worker.terminate();
+                        // resolve();
+                    // };
+                // });
+            // });
+        // };
 
         const typingDebounce = debounce(
             () => {
@@ -68,24 +68,24 @@ export default class BlockRefCounter extends Plugin {
             typingDebounce();
         });
 
-        const indexDebounce = debounce(
-            () => {
-                index().then(() => {
-                    createPreviewView(this.app);
-                });
-            },
-            100,
-            true
-        );
-        const indexShortDebounce = debounce(
-            () => {
-                index().then(() => {
-                    createPreviewView(this.app);
-                });
-            },
-            50,
-            true
-        );
+        // const indexDebounce = debounce(
+            // () => {
+                // index().then(() => {
+                    // createPreviewView(this.app);
+                // });
+            // },
+            // 100,
+            // true
+        // );
+        // const indexShortDebounce = debounce(
+            // () => {
+                // index().then(() => {
+                    // createPreviewView(this.app);
+                // });
+            // },
+            // 50,
+            // true
+        // );
 
 
         /**
@@ -93,114 +93,143 @@ export default class BlockRefCounter extends Plugin {
          * and if the metadataCache has been resolved for the first time
          * avoids trying to create an index while obsidian is indexing files
          */
-        if (!this.app.workspace.layoutReady) {
-            this.resolved = this.app.metadataCache.on("resolved", () => {
-                this.app.metadataCache.offref(this.resolved);
-                index().then(() => {
-                    createPreviewView(this.app);
-                });
-            });
-        } else {
-            index().then(() => {
-                createPreviewView(this.app);
-            });
-        }
-
-        this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
-            if (!this.app.viewRegistry.getViewCreatorByType("search")) {
-                return;
-            }
-            const newView: View =
-                this.app.viewRegistry.getViewCreatorByType("search")(leaf);
-            newView.getViewType = () => "search-ref";
-            return newView;
-        });
-
-        /**
-         * Event listeners to re-index notes if the cache changes or a note is deleted
-         * triggers creation of block ref buttons on the preview view
-         */
-        this.registerEvent(
-            this.app.metadataCache.on("changed", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexDebounce();
-                    }
+        // if (!this.app.workspace.layoutReady) {
+            // this.resolved = this.app.metadataCache.on("resolved", () => {
+                // this.app.metadataCache.offref(this.resolved);
+                // index().then(() => {
+                    // createPreviewView(this.app);
+                // });
+            // });
+        // } else {
+            // index().then(() => {
+                // createPreviewView(this.app);
+            // });
+        // }
+//
+        // this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
+            // if (!this.app.viewRegistry.getViewCreatorByType("search")) {
+                // return;
+            // }
+            // const newView: View =
+                // this.app.viewRegistry.getViewCreatorByType("search")(leaf);
+            // newView.getViewType = () => "search-ref";
+            // return newView;
+        // });
+//
+//        *
+        // Event listeners to re-index notes if the cache changes or a note is deleted
+        // triggers creation of block ref buttons on the preview view
+        // this.registerEvent(
+            // this.app.metadataCache.on("changed", () => {
+                // if (!this.typingIndicator) {
+                    // if (checkForChanges(this.app)) {
+                        // indexDebounce();
+                    // }
+                // }
+            // })
+        // );
+//
+        // this.registerEvent(
+            // this.app.vault.on("delete", () => {
+                // if (!this.typingIndicator) {
+                    // if (checkForChanges(this.app)) {
+                        // indexShortDebounce();
+                    // }
+                // }
+            // })
+        // );
+//
+ //       *
+        // Event listeners for layout changes to update the preview view with a block ref count button
+//
+        // this.registerEvent(
+            // this.app.workspace.on("layout-change", () => {
+                // if (!this.typingIndicator) {
+                    // if (checkForChanges(this.app)) {
+                        // indexShortDebounce();
+                    // }
+                // }
+                // const activeLeaf =
+                    // this.app.workspace.getActiveLeafOfViewType(MarkdownView);
+                // if (activeLeaf) {
+                    // try {
+                        // activeLeaf.previewMode?.renderer.onRendered(() => {
+                            // createPreviewView(this.app);
+                        // });
+                    // } catch (e) {
+                        // console.log(e);
+                    // }
+                // }
+            // })
+        // );
+//
+        // this.registerEvent(
+            // this.app.workspace.on("active-leaf-change", () => {
+                // if (!this.typingIndicator) {
+                    // if (checkForChanges(this.app)) {
+                        // indexShortDebounce();
+                    // }
+                // }
+            // })
+        // );
+//
+        // this.registerEvent(
+            // this.app.workspace.on("file-open", () => {
+                // indexShortDebounce();
+            // })
+        // );
+//
+        // this.registerMarkdownPostProcessor((el, ctx) => {
+            // const view = this.app.workspace.getActiveViewOfType(
+                // MarkdownView as unknown as Constructor<View>
+            // );
+            // if (view) {
+                // const path = view.file.path;
+                // const sectionInfo = ctx.getSectionInfo(el);
+                // const lineStart = sectionInfo && sectionInfo.lineStart;
+                // const page = getPage(path);
+                // if (page && lineStart) {
+                    // processPage(page, this.app, el, lineStart);
+                // }
+            // }
+            // if (checkForChanges(this.app)) {
+                // indexDebounce();
+            // }
+        // });
+//
+//        This runs only one time at beginning when Obsidian is completely loaded after startup
+//
+        this.registerEvent(this.app.workspace.on("file-open", file => {
+            const path = file.path.replace(/\/|\s/g, '-')
+            const cache = this.app.metadataCache.getFileCache(file)
+            const references = this.app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
+                const key = link.reference.link
+                if (!acc[key]) {
+                    acc[key] = []
                 }
-            })
-        );
-
-        this.registerEvent(
-            this.app.vault.on("delete", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexShortDebounce();
-                    }
+                if (acc[key]) {
+                    acc[key].push(link)
                 }
-            })
-        );
-
-        /**
-         * Event listeners for layout changes to update the preview view with a block ref count button
-         */
-
-        this.registerEvent(
-            this.app.workspace.on("layout-change", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexShortDebounce();
-                    }
+                return acc
+            }, {})
+            const links = this.app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
+                const key = link.sourceFile.path.replace(/\/|\s/g, '-')
+                const reference = link.reference.link
+                if (!acc[key]) {
+                    acc[key] = {}
                 }
-                const activeLeaf =
-                    this.app.workspace.getActiveLeafOfViewType(MarkdownView);
-                if (activeLeaf) {
-                    try {
-                        activeLeaf.previewMode?.renderer.onRendered(() => {
-                            createPreviewView(this.app);
-                        });
-                    } catch (e) {
-                        console.log(e);
-                    }
+                if (!acc[key][reference]) {
+                    acc[key][reference] = {}
                 }
-            })
-        );
+                acc[key][reference] = references[reference]
+                return acc
+            }, {})
+            const currentPage = links[path]
+            currentPage.cache = cache
+            createPreviewView(currentPage, this.app)
+            console.log(currentPage)
 
-        this.registerEvent(
-            this.app.workspace.on("active-leaf-change", () => {
-                if (!this.typingIndicator) {
-                    if (checkForChanges(this.app)) {
-                        indexShortDebounce();
-                    }
-                }
-            })
-        );
-
-        this.registerEvent(
-            this.app.workspace.on("file-open", () => {
-                indexShortDebounce();
-            })
-        );
-
-        this.registerMarkdownPostProcessor((el, ctx) => {
-            const view = this.app.workspace.getActiveViewOfType(
-                MarkdownView as unknown as Constructor<View>
-            );
-            if (view) {
-                const path = view.file.path;
-                const sectionInfo = ctx.getSectionInfo(el);
-                const lineStart = sectionInfo && sectionInfo.lineStart;
-                const page = getPage(path);
-                if (page && lineStart) {
-                    processPage(page, this.app, el, lineStart);
-                }
-            }
-            if (checkForChanges(this.app)) {
-                indexDebounce();
-            }
-        });
-
-        //This runs only one time at beginning when Obsidian is completely loaded after startup
-
+        }))
         this.app.workspace.onLayoutReady(() => {
             unloadSearchViews(this.app);
         });
@@ -227,7 +256,7 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 
-function createPreviewView(app: App): void {
+function createPreviewView(page, app: App): void {
     const view = app.workspace.getActiveViewOfType(
         MarkdownView as unknown as Constructor<View>
     );
@@ -237,7 +266,6 @@ function createPreviewView(app: App): void {
     const sourcePath = view.file?.path;
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections;
-    const page = getPage(sourcePath);
     if (page && elements) {
         elements.forEach((section: { el: HTMLElement; lineStart: number }) => {
             processPage(page, app, section.el, section.lineStart);
