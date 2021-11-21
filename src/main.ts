@@ -9,13 +9,13 @@ import {
     WorkspaceLeaf,
     View,
     TFile,
+    SectionCache,
+    ListItemCache
 } from "obsidian";
-import { Block, Section, Heading, EmbedOrLinkItem, Reference } from "./types";
+import { Block, ListItem,  Section, Heading, EmbedOrLinkItem, Reference } from "./types";
 import {
-    indexBlockReferences,
-    getPages,
-    cleanHeader,
-    setPages,
+    buildLinksAndReferences,
+    getCurrentPage
 } from "./indexer";
 import {
     BlockRefCountSettingTab,
@@ -34,7 +34,7 @@ import {
  */
 export default class BlockRefCounter extends Plugin {
     private resolved: EventRef
-    private typingIndicator: boolean
+    private page
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
@@ -42,50 +42,14 @@ export default class BlockRefCounter extends Plugin {
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
 
-        // const index = (): Promise<void> => {
-            // return new Promise((resolve) => {
-                // const worker = new IndexWebWorker();
-                // indexBlockReferences(this.app).then((pages) => {
-                    // worker.postMessage({ pages });
-                    // worker.onmessage = (e) => {
-                        // setPages(e.data.pages);
-                        // worker.terminate();
-                        // resolve();
-                    // };
-                // });
-            // });
-        // };
 
-        const typingDebounce = debounce(
+        const indexDebounce = debounce(
             () => {
-                this.typingIndicator = false;
+                buildLinksAndReferences(this.app)
             },
-            100,
+            500,
             true
         );
-        this.registerDomEvent(document, "keyup", () => {
-            this.typingIndicator = true;
-            typingDebounce();
-        });
-
-        // const indexDebounce = debounce(
-            // () => {
-                // index().then(() => {
-                    // createPreviewView(this.app);
-                // });
-            // },
-            // 100,
-            // true
-        // );
-        // const indexShortDebounce = debounce(
-            // () => {
-                // index().then(() => {
-                    // createPreviewView(this.app);
-                // });
-            // },
-            // 50,
-            // true
-        // );
 
 
         /**
@@ -93,92 +57,69 @@ export default class BlockRefCounter extends Plugin {
          * and if the metadataCache has been resolved for the first time
          * avoids trying to create an index while obsidian is indexing files
          */
-        // if (!this.app.workspace.layoutReady) {
-            // this.resolved = this.app.metadataCache.on("resolved", () => {
-                // this.app.metadataCache.offref(this.resolved);
-                // index().then(() => {
-                    // createPreviewView(this.app);
-                // });
-            // });
-        // } else {
-            // index().then(() => {
-                // createPreviewView(this.app);
-            // });
-        // }
-//
-        // this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
-            // if (!this.app.viewRegistry.getViewCreatorByType("search")) {
-                // return;
-            // }
-            // const newView: View =
-                // this.app.viewRegistry.getViewCreatorByType("search")(leaf);
-            // newView.getViewType = () => "search-ref";
-            // return newView;
-        // });
-//
+        if (!this.app.workspace.layoutReady) {
+            this.resolved = this.app.metadataCache.on("resolved", () => {
+                this.app.metadataCache.offref(this.resolved);
+                indexDebounce();
+            });
+        } else {
+            indexDebounce();
+        }
+
+        this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
+            if (!this.app.viewRegistry.getViewCreatorByType("search")) {
+                return;
+            }
+            const newView: View =
+                this.app.viewRegistry.getViewCreatorByType("search")(leaf);
+            newView.getViewType = () => "search-ref";
+            return newView;
+        });
+
 //        *
         // Event listeners to re-index notes if the cache changes or a note is deleted
         // triggers creation of block ref buttons on the preview view
-        // this.registerEvent(
-            // this.app.metadataCache.on("changed", () => {
-                // if (!this.typingIndicator) {
-                    // if (checkForChanges(this.app)) {
-                        // indexDebounce();
-                    // }
-                // }
-            // })
-        // );
-//
-        // this.registerEvent(
-            // this.app.vault.on("delete", () => {
-                // if (!this.typingIndicator) {
-                    // if (checkForChanges(this.app)) {
-                        // indexShortDebounce();
-                    // }
-                // }
-            // })
-        // );
-//
+
+        this.registerEvent(
+            this.app.vault.on("delete", () => {
+                        indexDebounce();
+            })
+        );
+
  //       *
         // Event listeners for layout changes to update the preview view with a block ref count button
 //
-        // this.registerEvent(
-            // this.app.workspace.on("layout-change", () => {
-                // if (!this.typingIndicator) {
-                    // if (checkForChanges(this.app)) {
-                        // indexShortDebounce();
-                    // }
-                // }
-                // const activeLeaf =
-                    // this.app.workspace.getActiveLeafOfViewType(MarkdownView);
-                // if (activeLeaf) {
-                    // try {
-                        // activeLeaf.previewMode?.renderer.onRendered(() => {
-                            // createPreviewView(this.app);
-                        // });
-                    // } catch (e) {
-                        // console.log(e);
-                    // }
-                // }
-            // })
-        // );
-//
-        // this.registerEvent(
-            // this.app.workspace.on("active-leaf-change", () => {
-                // if (!this.typingIndicator) {
-                    // if (checkForChanges(this.app)) {
-                        // indexShortDebounce();
-                    // }
-                // }
-            // })
-        // );
-//
-        // this.registerEvent(
-            // this.app.workspace.on("file-open", () => {
-                // indexShortDebounce();
-            // })
-        // );
-//
+        this.registerEvent(
+            this.app.workspace.on("layout-change", () => {
+                indexDebounce()
+                const activeLeaf =
+                    this.app.workspace.getActiveLeafOfViewType(MarkdownView);
+                if (activeLeaf && activeLeaf.view) {
+                this.page =  getCurrentPage(activeLeaf.view.file, this.app);
+                    try {
+                        activeLeaf.previewMode?.renderer.onRendered(() => {
+                            createPreviewView(this.page, this.app);
+                        });
+                    } catch (e) {
+                        console.log(e);
+                    }
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on("active-leaf-change", () => {
+                indexDebounce()
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on("file-open", (file) => {
+                indexDebounce()
+                this.page =  getCurrentPage(file, this.app)
+            })
+        );
+
         this.registerMarkdownPostProcessor((el, ctx) => {
             const view = this.app.workspace.getActiveViewOfType(
                 MarkdownView as unknown as Constructor<View>
@@ -186,9 +127,8 @@ export default class BlockRefCounter extends Plugin {
             if (view) {
                 const sectionInfo = ctx.getSectionInfo(el);
                 const lineStart = sectionInfo && sectionInfo.lineStart;
-                const page = getCurrentPage(view.file, this.app)
-                if (page && lineStart) {
-                    processPage(page, this.app, el, lineStart);
+                if (this.page && lineStart) {
+                    processPage(this.page, this.app, el, lineStart);
                 }
             }
         });
@@ -228,10 +168,8 @@ function createPreviewView(page, app: App): void {
     if (!view) {
         return;
     }
-    const sourcePath = view.file?.path;
     // if previewMode exists and has sections, get the sections
     const elements = view.previewMode?.renderer?.sections;
-    console.log(page, elements)
     if (page && elements) {
         elements.forEach((section: { el: HTMLElement; lineStart: number }) => {
             processPage(page, app, section.el, section.lineStart);
@@ -241,20 +179,18 @@ function createPreviewView(page, app: App): void {
 
 function processPage(
     page: {
-        cache: {
         sections: Section[]
         blocks: Block[]
         headings: Heading[]
-        },
-        items: EmbedOrLinkItem[]
+        links: EmbedOrLinkItem[]
     },
     app: App,
     el: HTMLElement,
     start: number
 ) {
     const settings = getSettings();
-    if (page.cache.sections) {
-        page.cache.sections.forEach((pageSection: Section) => {
+    if (page.sections) {
+        page.sections.forEach((pageSection: Section) => {
             if (pageSection.position.start.line === start) {
                 pageSection.pos = pageSection.position.start.line;
                 const type = pageSection?.type;
@@ -264,25 +200,25 @@ function processPage(
                 const hasEmbed = embeds.length > 0 ? true : false;
                 if (
                     (settings.displayParent &&
-                        page.cache.blocks &&
+                        page.blocks &&
                         !hasEmbed &&
                         type === "paragraph") ||
                     type === "list" ||
                     type === "blockquote" ||
                     type === "code"
                 ) {
-                    addBlockReferences(app, el, page.cache.blocks, pageSection);
+                    addBlockReferences(app, el, page.blocks, pageSection);
                 }
                 if (
                     settings.displayParent &&
-                    page.cache.headings &&
+                    page.headings &&
                     type === "heading"
                 ) {
-                    addHeaderReferences(app, el, page.cache.headings, pageSection);
+                    addHeaderReferences(app, el, page.headings, pageSection);
                 }
 
-                if (settings.displayChild && page.items) {
-                    addLinkReferences(app, el, page.items, pageSection, embeds);
+                if (settings.displayChild && page.links) {
+                    addLinkReferences(app, el, page.links, pageSection, embeds);
                 }
             }
         });
@@ -354,19 +290,19 @@ function addLinkReferences(
         if (section.type === "paragraph" && section.pos === link.pos) {
             embedLinks &&
                 embedLinks.forEach((embedLink) => {
-                    link.reference &&
+                    link &&
                         embedLink &&
                         // need to delay a bit until the embed is loaded into the view
                         setTimeout(() => {
                             createButtonElement(
                                 app,
-                                link.reference,
+                                link,
                                 embedLink.firstChild as HTMLElement
                             );
                         }, 1);
                 });
-            if (link.reference && !link.embed) {
-                createButtonElement(app, link.reference, val);
+            if (link && !link.embed) {
+                createButtonElement(app, link, val);
             }
         }
         // Have to iterate list items so the button gets attached to the right element
@@ -376,23 +312,23 @@ function addLinkReferences(
                 embedLinks &&
                     embedLinks.forEach((embedLink) => {
                         if (
-                            link.reference &&
+                            link &&
                             embedLink &&
-                            item.id === link.reference.key
+                            item.id === link.key
                         ) {
                             setTimeout(() => {
                                 createButtonElement(
                                     app,
-                                    link.reference,
+                                    link,
                                     embedLink.firstChild as HTMLElement
                                 );
                             }, 1);
                         }
                     });
-                if (link.reference && !link.embed && item.pos === link.pos) {
+                if (link && !link.embed && item.pos === link.pos) {
                     // change the type from link to block so createButtonElement adds the button to the right place
 
-                    createButtonElement(app, link.reference, buttons[index]);
+                    createButtonElement(app, link, buttons[index]);
                 }
             });
         }
@@ -437,7 +373,6 @@ function createButtonElement(
     block: Block | Heading,
     val: HTMLElement
 ): void {
-console.log('creating button')
     if (val) {
         const count = block && block.references ? block.references.length : 0;
         const normalizedKey = normalize(block.key);
@@ -455,7 +390,7 @@ console.log('creating button')
 
         if (tableType === "basic") {
             const refs = block.references
-                ? Array.from(block.references)
+                ? block.references
                 : undefined;
             const refTable: HTMLElement = createTable(app, val, refs);
             countEl.on("click", "button", () => {
@@ -482,7 +417,7 @@ console.log('creating button')
                     tempLeaf.tabHeaderEl.hide();
                     const blockKeyEsc = regexEscape(block.key);
                     const blockPageEsc = regexEscape(block.page);
-                    const blockKeyClean = cleanHeader(block.key);
+                    const blockKeyClean = block.key
                     await tempLeaf.setViewState({
                         type: "search-ref",
                         state: {
@@ -595,19 +530,16 @@ function createTable(
     refTable.appendChild(removeTable);
     refs &&
         refs.forEach(async (ref) => {
-            const file = (await app.vault.getAbstractFileByPath(
-                ref.path
-            )) as TFile;
             const lineContent = await app.vault
-                .cachedRead(file)
-                .then((content) => content.split("\n")[ref.pos]);
+                .cachedRead(ref.sourceFile)
+                .then((content) => content.split("\n")[ref.reference.position.start.line]);
             const row = createEl("tr");
             const noteCell = createEl("td");
             const lineCell = createEl("td");
             noteCell.createEl("a", {
                 cls: "internal-link",
-                href: ref.path,
-                text: ref.basename,
+                href: ref.sourceFile.path,
+                text: ref.sourceFile.basename,
             });
 
             lineCell.createEl("span", { text: lineContent });
@@ -647,38 +579,7 @@ function regexEscape(regexString: string) {
     return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, "\\$1");
 }
 
-//utility function to fetch a specific page from the index
-function getPage(sourcePath: string) {
-    const pages = getPages();
-    return (
-        pages[0] &&
-        getPages().reduce((acc, page) => {
-            if (page.file.path === sourcePath) {
-                acc = page;
-            }
-            return acc;
-        })
-    );
-}
 
-//get the current active page and compare the cache to what is in the index
-function checkForChanges(app: App) {
-    const activeView = app.workspace.getActiveViewOfType(
-        MarkdownView as unknown as Constructor<View>
-    );
-    if (activeView) {
-        const activePage = getPage(activeView.file.path);
-        if (activePage) {
-            const currentCache = app.metadataCache.getFileCache(activeView.file);
-            if (currentCache) {
-                if (isEqual(activePage.cache, currentCache)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-}
 
 const normalize = (str: string) => {
     return str.replace(/\s+|'/g, "").toLowerCase();
@@ -700,84 +601,3 @@ const isEqual = (a: any, b: any) => {
     return true;
 };
 
-function createListSections(
-    sections: SectionCache[],
-    listItems: ListItemCache[]
-): Section[] {
-    if (listItems) {
-        return sections.map((section) => {
-            const items: ListItem[] = [];
-            if (section.type === "list") {
-                listItems.forEach((item: ListItem) => {
-                    if (
-                        item.position.start.line >=
-                            section.position.start.line &&
-                        item.position.start.line <= section.position.end.line
-                    ) {
-                        items.push({ pos: item.position.start.line, ...item });
-                    }
-                });
-                const sectionWithItems = { items, ...section };
-                return sectionWithItems;
-            }
-            return section;
-        });
-    }
-
-    return sections;
-}
-function getCurrentPage(file, app) {
-            const path = file.path.replace(/\/|\s/g, '-')
-            const cache = app.metadataCache.getFileCache(file)
-            const transformedCache = {...cache}
-            const references = app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
-                const key = link.reference.link
-                if (!acc[key]) {
-                    acc[key] = []
-                }
-                if (acc[key]) {
-                    acc[key].push(link)
-                }
-                return acc
-            }, {})
-        if (cache.blocks) {
-        transformedCache.blocks = Object.values(cache.blocks).map((block) => ({
-            key: block.id,
-            pos: block.position.start.line,
-            page: file.basename,
-            type: "block",
-            references: references[`${file.basename}#^${block.id}`]
-        }));
-            }
-        if (cache.headings) {
-
-        transformedCache.headings = cache.headings.map(
-            (header: {
-                heading: string
-                position: { start: { line: number } }
-            }) => ({
-                key: header.heading,
-                pos: header.position.start.line,
-
-                page: file.basename,
-                type: "header",
-                references: references[`${file.basename}#${header.heading}`]         })
-                )
-            }
-            if (cache.sections) {
-                transformedCache.sections = createListSections(cache.sections, cache.listItems)
-            }
-            const links = app.fileManager.getAllLinkResolutions().reduce((acc, link) => {
-                const key = link.sourceFile.path.replace(/\/|\s/g, '-')
-                const reference = link.reference.link
-                if (!acc[key]) {
-                    acc[key] = {items: {}}
-                } 
-                acc[key]['items'][reference] = references[reference]
-                return acc
-            }, {})
-            const currentPage = links[path]
-            currentPage.cache = transformedCache
-            return currentPage
-
-        }
