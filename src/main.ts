@@ -262,7 +262,6 @@ function addBlockReferences(
                 }
 
                 if (section.type === "blockquote" || section.type === "code") {
-                    block.type = "link";
                     createButtonElement(app, block, val);
                 }
             }
@@ -272,7 +271,7 @@ function addBlockReferences(
             if (section.type === "list") {
                 section.items.forEach((item, index: number) => {
                     const buttons = val.querySelectorAll("li");
-                    block.type = "list";
+                    block.type = "block-list";
                     if (item.id === block.key) {
                         createButtonElement(app, block, buttons[index]);
                     }
@@ -308,7 +307,7 @@ function addEmbedReferences(
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li");
                 if (item.pos === embed.pos) {
-                    embed.type = "list";
+                    embed.type = "link-list";
                     createButtonElement(app, embed, buttons[index]);
                 }
             });
@@ -341,7 +340,7 @@ function addLinkReferences(
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li");
                 if (item.pos === link.pos) {
-                    link.type = "list";
+                    link.type = "link-list";
                     createButtonElement(app, link, buttons[index]);
                 }
             });
@@ -410,7 +409,7 @@ function createButtonElement(
                     block.type === "block" && val.appendChild(refTable);
                     block.type === "header" && val.appendChild(refTable);
                     block.type === "link" && val.append(refTable);
-                    block.type === "list" &&
+                    block.type.includes("list") &&
                         val.insertBefore(refTable, val.children[2]);
                 } else {
                     if (val.children.namedItem("ref-table")) {
@@ -433,7 +432,7 @@ function createButtonElement(
                     let firstReference;
                     let secondReference;
 
-                    if (block.type === "link" || block.type === "list") {
+                    if (block.type === "link" || block.type === "link-list") {
                         page = block.key;
                         if (
                             block.key.includes("#") &&
@@ -451,7 +450,8 @@ function createButtonElement(
                             }
                         }
                         if (block.key.includes("#^")) {
-                            firstReference = `"^${block.key.split("#^")[1]}"`;
+                            page = block.key.split("#^")[0];
+                            firstReference = `^${block.key.split("#^")[1]}`;
                             if (block.key.includes("|")) {
                                 firstReference = `${
                                     firstReference.split("|")[0]
@@ -478,7 +478,7 @@ function createButtonElement(
                         )}$/`;
                         secondReference = `/#${block.key}]]/`;
                     }
-                    if (block.type === "block") {
+                    if (block.type === "block" || block.type === "block-list") {
                         page = block.page;
                         firstReference = `"^${block.key}"`;
                         secondReference = firstReference;
@@ -522,7 +522,7 @@ function createButtonElement(
                         block.type === "header" &&
                             val.appendChild(searchElement);
                         block.type === "link" && val.append(searchElement);
-                        block.type === "list" &&
+                        block.type.includes("list")&&
                             val.insertBefore(searchElement, val.children[2]);
                     } else {
                         if (val.children.namedItem("search-ref")) {
