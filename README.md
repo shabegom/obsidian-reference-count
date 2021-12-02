@@ -1,9 +1,6 @@
 # Obsidian Block Reference Counts
 **By shabegom**
 
-[![](img/brc.png)](https://youtu.be/gxEyKJ0Z7Qs)  
-[Click Here to Watch the Release Video](https://youtu.be/gxEyKJ0Z7Qs)
-
 ![](img/readme.png)
 
 Show the amount of references you have in:
@@ -25,6 +22,14 @@ Now available in Community Plugins!
 If you run into a bug, please submit an issue. If you have any questions reach out to @shabegom on the obsidian Discord.
 
 ## Changelog
+
+**0.3.0**
+Major Rewrite!  
+- Uses new method of generated block references that is 10x faster than previous approach!
+- Should now support non-englished languages
+- Should support relative and full path links and embeds
+- Improved accuracy of the search results view
+- More responsive in updating reference counts
 
 **0.1.6**
 - Released in Community Plugins! 🎉
