@@ -9,7 +9,12 @@ import {
     WorkspaceLeaf,
     View,
 } from "obsidian";
-import { Section, Link,  TransformedCache, TransformedCachedItem}  from "./types";
+import {
+    Section,
+    Link,
+    TransformedCache,
+    TransformedCachedItem,
+} from "./types";
 import { buildLinksAndReferences, getCurrentPage } from "./indexer";
 import {
     BlockRefCountSettingTab,
@@ -267,6 +272,7 @@ function addBlockReferences(
             if (section.type === "list") {
                 section.items.forEach((item, index: number) => {
                     const buttons = val.querySelectorAll("li");
+                    block.type = "list";
                     if (item.id === block.key) {
                         createButtonElement(app, block, buttons[index]);
                     }
@@ -302,6 +308,7 @@ function addEmbedReferences(
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li");
                 if (item.pos === embed.pos) {
+                    embed.type = "list";
                     createButtonElement(app, embed, buttons[index]);
                 }
             });
@@ -334,6 +341,7 @@ function addLinkReferences(
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li");
                 if (item.pos === link.pos) {
+                    link.type = "list";
                     createButtonElement(app, link, buttons[index]);
                 }
             });
@@ -402,6 +410,8 @@ function createButtonElement(
                     block.type === "block" && val.appendChild(refTable);
                     block.type === "header" && val.appendChild(refTable);
                     block.type === "link" && val.append(refTable);
+                    block.type === "list" &&
+                        val.insertBefore(refTable, val.children[2]);
                 } else {
                     if (val.children.namedItem("ref-table")) {
                         val.removeChild(refTable);
@@ -411,7 +421,6 @@ function createButtonElement(
         }
         if (tableType === "search") {
             countEl.on("click", "button", async () => {
-                console.log(block.type, block.key);
                 const searchEnabled =
                     app.internalPlugins.getPluginById("global-search").enabled;
                 if (!searchEnabled) {
@@ -424,7 +433,7 @@ function createButtonElement(
                     let firstReference;
                     let secondReference;
 
-                    if (block.type === "link") {
+                    if (block.type === "link" || block.type === "list") {
                         page = block.key;
                         if (
                             block.key.includes("#") &&
@@ -437,12 +446,11 @@ function createButtonElement(
                                 )}$/`;
                             } else {
                                 firstReference = `/^#{1,6} ${regexEscape(
-                                    block.key
+                                    block.key.split("#")[1]
                                 )}$/`;
                             }
                         }
                         if (block.key.includes("#^")) {
-                            console.log("is " + block.key);
                             firstReference = `"^${block.key.split("#^")[1]}"`;
                             if (block.key.includes("|")) {
                                 firstReference = `${
@@ -476,7 +484,6 @@ function createButtonElement(
                         secondReference = firstReference;
                     }
                     const searchQuery = `(file:("${page}.md") ${firstReference}) OR (${secondReference}) `;
-                    console.log(searchQuery);
                     await tempLeaf.setViewState({
                         type: "search-ref",
                         state: {
@@ -515,6 +522,8 @@ function createButtonElement(
                         block.type === "header" &&
                             val.appendChild(searchElement);
                         block.type === "link" && val.append(searchElement);
+                        block.type === "list" &&
+                            val.insertBefore(searchElement, val.children[2]);
                     } else {
                         if (val.children.namedItem("search-ref")) {
                             app.workspace
@@ -542,7 +551,11 @@ function createButtonElement(
     }
 }
 
-function createSearchElement(app: App, search: WorkspaceLeaf[], block: TransformedCachedItem) {
+function createSearchElement(
+    app: App,
+    search: WorkspaceLeaf[],
+    block: TransformedCachedItem
+) {
     const searchElement = search[search.length - 1].view.containerEl;
     const normalizedKey = normalize(block.key);
     searchElement.setAttribute("data-block-ref-id", normalizedKey);
@@ -565,11 +578,7 @@ function createSearchElement(app: App, search: WorkspaceLeaf[], block: Transform
     return searchElement;
 }
 
-function createTable(
-    app: App,
-    val: HTMLElement,
-    refs: Link[]
-): HTMLElement {
+function createTable(app: App, val: HTMLElement, refs: Link[]): HTMLElement {
     const refTable = createEl("table", { cls: "ref-table" });
     refTable.setAttribute("id", "ref-table");
     const noteHeaderRow = createEl("tr").createEl("th", { text: "Note" });
@@ -645,4 +654,3 @@ function regexEscape(string: string) {
 const normalize = (str: string) => {
     return str.replace(/\s+|'/g, "").toLowerCase();
 };
-

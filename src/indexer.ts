@@ -2,28 +2,42 @@ import {
     App,
     ListItemCache,
     SectionCache,
-    stripHeading, TFile
+    stripHeading,
+    TFile,
 } from "obsidian";
 import { Link, ListItem, Section, TransformedCache } from "./types";
 
-let references: {[x: string]: Link[]};
+let references: { [x: string]: Link[] };
 
 export function buildLinksAndReferences(app: App): void {
-    const refs = app.fileManager.getAllLinkResolutions().reduce((acc: { [x: string]: Link[]; }, link: Link): { [x: string]: Link[]; } => {
-        const key = link.reference.link;
-        if (!acc[key]) {
-            acc[key] = [];
-        }
-        if (acc[key]) {
-            acc[key].push(link);
-        }
-        return acc;
-    }, {});
+    const refs = app.fileManager
+        .getAllLinkResolutions()
+        .reduce(
+            (
+                acc: { [x: string]: Link[] },
+                link: Link
+            ): { [x: string]: Link[] } => {
+                const key = link.reference.link;
+                if (!acc[key]) {
+                    acc[key] = [];
+                }
+                if (acc[key]) {
+                    acc[key].push(link);
+                }
+                return acc;
+            },
+            {}
+        );
     references = refs;
 }
 
-
-export function getCurrentPage({ file, app }: { file: TFile; app: App; }): TransformedCache {
+export function getCurrentPage({
+    file,
+    app,
+}: {
+    file: TFile;
+    app: App;
+}): TransformedCache {
     const cache = app.metadataCache.getFileCache(file);
     const transformedCache: TransformedCache = {};
     if (cache.blocks) {
@@ -61,12 +75,12 @@ export function getCurrentPage({ file, app }: { file: TFile; app: App; }): Trans
         );
     }
     if (cache.links) {
-        transformedCache.links = cache.links.map((link) => ({         
+        transformedCache.links = cache.links.map((link) => ({
             key: link.link,
             type: "link",
-            pos:  link.position.start.line,
+            pos: link.position.start.line,
             page: file.basename,
-            references: references[link.link]
+            references: references[link.link],
         }));
         if (transformedCache.links) {
             transformedCache.links = transformedCache.links.map((link) => {
@@ -76,7 +90,10 @@ export function getCurrentPage({ file, app }: { file: TFile; app: App; }): Trans
                     transformedCache.headings
                 ) {
                     transformedCache.headings.forEach((header) => {
-                        if (stripHeading(header.key) === stripHeading(link.key.split("#")[1])) {
+                        if (
+                            stripHeading(header.key) ===
+                            stripHeading(link.key.split("#")[1])
+                        ) {
                             link.original = header.original;
                         }
                     });
@@ -88,9 +105,9 @@ export function getCurrentPage({ file, app }: { file: TFile; app: App; }): Trans
     if (cache.embeds) {
         transformedCache.embeds = cache.embeds.map((embed) => ({
             key: embed.link,
-            page:  file.basename,
+            page: file.basename,
             type: "link",
-            pos:  embed.position.start.line,
+            pos: embed.position.start.line,
             references: references[embed.link],
         }));
         if (transformedCache.embeds) {
@@ -101,7 +118,10 @@ export function getCurrentPage({ file, app }: { file: TFile; app: App; }): Trans
                     transformedCache.headings
                 ) {
                     transformedCache.headings.forEach((header) => {
-                        if (stripHeading(header.key) === stripHeading(embed.key.split("#")[1])) {
+                        if (
+                            stripHeading(header.key) ===
+                            stripHeading(embed.key.split("#")[1])
+                        ) {
                             embed.original = header.original;
                         }
                     });
