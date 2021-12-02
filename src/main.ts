@@ -8,33 +8,26 @@ import {
     Plugin,
     WorkspaceLeaf,
     View,
-    TFile,
-    SectionCache,
-    ListItemCache
 } from "obsidian";
-import { Block, ListItem,  Section, Heading, EmbedOrLinkItem, Reference } from "./types";
-import {
-    buildLinksAndReferences,
-    getCurrentPage
-} from "./indexer";
+import { Section, Link,  TransformedCache, TransformedCachedItem}  from "./types";
+import { buildLinksAndReferences, getCurrentPage } from "./indexer";
 import {
     BlockRefCountSettingTab,
     getSettings,
     updateSettings,
 } from "./settings";
-//import IndexWebWorker from "web-worker:./IndexWorker.ts";
 
-/**
+/*
  * BlockRefCounter Plugin
- * by shabegom and Murf
+ * by shabegom
  *
  * Iterates through the cache of all notes in a vault and creates an index of block-ids, headings, links referencing a block-id or heading, and embeds
  * Adds a button in Preview view with the count of references found
  * When button is clicked, reveals a table with links to each reference and line reference exists on
  */
 export default class BlockRefCounter extends Plugin {
-    private resolved: EventRef
-    private page
+    private resolved: EventRef;
+    private page: TransformedCache;
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
@@ -42,15 +35,22 @@ export default class BlockRefCounter extends Plugin {
 
         this.addSettingTab(new BlockRefCountSettingTab(this.app, this));
 
-
         const indexDebounce = debounce(
             () => {
-                buildLinksAndReferences(this.app)
+                buildLinksAndReferences(this.app);
             },
-            500,
+            1000,
             true
         );
-
+        const previewDebounce = debounce(
+            () => {
+                createPreviewView(this.app);
+            },
+            100,
+            true
+        );
+        buildLinksAndReferences(this.app);
+        createPreviewView(this.app);
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -60,10 +60,12 @@ export default class BlockRefCounter extends Plugin {
         if (!this.app.workspace.layoutReady) {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 this.app.metadataCache.offref(this.resolved);
-                indexDebounce();
+                buildLinksAndReferences(this.app);
+                createPreviewView(this.app);
             });
         } else {
-            indexDebounce();
+            buildLinksAndReferences(this.app);
+            createPreviewView(this.app);
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -76,65 +78,59 @@ export default class BlockRefCounter extends Plugin {
             return newView;
         });
 
-//        *
+        //        *
         // Event listeners to re-index notes if the cache changes or a note is deleted
         // triggers creation of block ref buttons on the preview view
 
         this.registerEvent(
             this.app.vault.on("delete", () => {
-                        indexDebounce();
+                indexDebounce();
             })
         );
 
- //       *
+        //       *
         // Event listeners for layout changes to update the preview view with a block ref count button
-//
+        //
         this.registerEvent(
             this.app.workspace.on("layout-change", () => {
-                indexDebounce()
-                const activeLeaf =
-                    this.app.workspace.getActiveLeafOfViewType(MarkdownView);
-                if (activeLeaf && activeLeaf.view) {
-                this.page =  getCurrentPage(activeLeaf.view.file, this.app);
-                    try {
-                        activeLeaf.previewMode?.renderer.onRendered(() => {
-                            createPreviewView(this.page, this.app);
-                        });
-                    } catch (e) {
-                        console.log(e);
-                    }
-                }
+                indexDebounce();
+                previewDebounce();
             })
         );
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", () => {
-                indexDebounce()
+                indexDebounce();
+                previewDebounce();
             })
         );
 
         this.registerEvent(
-            this.app.workspace.on("file-open", (file) => {
-                indexDebounce()
-                this.page =  getCurrentPage(file, this.app)
+            this.app.workspace.on("file-open", (file): void => {
+                indexDebounce();
+                this.page = getCurrentPage({ file, app: this.app });
+                previewDebounce();
+            })
+        );
+
+        this.registerEvent(
+            this.app.metadataCache.on("resolve", (file) => {
+                indexDebounce();
+                this.page = getCurrentPage({ file, app: this.app });
+                previewDebounce();
             })
         );
 
         this.registerMarkdownPostProcessor((el, ctx) => {
-            const view = this.app.workspace.getActiveViewOfType(
-                MarkdownView as unknown as Constructor<View>
-            );
-            if (view) {
-                const sectionInfo = ctx.getSectionInfo(el);
-                const lineStart = sectionInfo && sectionInfo.lineStart;
-                if (this.page && lineStart) {
-                    processPage(this.page, this.app, el, lineStart);
-                }
+            const sectionInfo = ctx.getSectionInfo(el);
+            const lineStart = sectionInfo && sectionInfo.lineStart;
+            if (this.page && lineStart) {
+                processPage(this.page, this.app, el, lineStart);
             }
         });
-//
-//        This runs only one time at beginning when Obsidian is completely loaded after startup
-//
+        //
+        //        This runs only one time at beginning when Obsidian is completely loaded after startup
+        //
         this.app.workspace.onLayoutReady(() => {
             unloadSearchViews(this.app);
         });
@@ -161,29 +157,37 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 
-function createPreviewView(page, app: App): void {
-    const view = app.workspace.getActiveViewOfType(
+function createPreviewView(app: App): void {
+    const activeView = app.workspace.getActiveViewOfType(
         MarkdownView as unknown as Constructor<View>
     );
-    if (!view) {
-        return;
-    }
-    // if previewMode exists and has sections, get the sections
-    const elements = view.previewMode?.renderer?.sections;
-    if (page && elements) {
-        elements.forEach((section: { el: HTMLElement; lineStart: number }) => {
-            processPage(page, app, section.el, section.lineStart);
-        });
+    if (activeView) {
+        const page = getCurrentPage({ file: activeView.file, app });
+        try {
+            activeView.previewMode?.renderer.onRendered(() => {
+                // if previewMode exists and has sections, get the sections
+                const elements = activeView.previewMode?.renderer?.sections;
+                if (page && elements) {
+                    elements.forEach(
+                        (section: { el: HTMLElement; lineStart: number }) => {
+                            processPage(
+                                page,
+                                app,
+                                section.el,
+                                section.lineStart
+                            );
+                        }
+                    );
+                }
+            });
+        } catch (e) {
+            console.log(e);
+        }
     }
 }
 
 function processPage(
-    page: {
-        sections: Section[]
-        blocks: Block[]
-        headings: Heading[]
-        links: EmbedOrLinkItem[]
-    },
+    page: TransformedCache,
     app: App,
     el: HTMLElement,
     start: number
@@ -218,7 +222,10 @@ function processPage(
                 }
 
                 if (settings.displayChild && page.links) {
-                    addLinkReferences(app, el, page.links, pageSection, embeds);
+                    addLinkReferences(app, el, page.links, pageSection);
+                }
+                if (settings.displayChild && page.embeds) {
+                    addEmbedReferences(app, el, page.embeds, pageSection);
                 }
             }
         });
@@ -239,7 +246,7 @@ function processPage(
 function addBlockReferences(
     app: App,
     val: HTMLElement,
-    blocks: Block[],
+    blocks: TransformedCache["blocks"],
     section: Section
 ): void {
     blocks &&
@@ -268,6 +275,40 @@ function addBlockReferences(
         });
 }
 
+function addEmbedReferences(
+    app: App,
+    val: HTMLElement,
+    embeds: TransformedCache["embeds"],
+    section: Section
+): void {
+    embeds.forEach((embed) => {
+        if (section.pos === embed.pos) {
+            if (section.type === "paragraph") {
+                setTimeout(() => {
+                    createButtonElement(app, embed, val);
+                }, 500);
+            }
+
+            if (section.type === "blockquote" || section.type === "code") {
+                setTimeout(() => {
+                    createButtonElement(app, embed, val);
+                }, 500);
+            }
+        }
+
+        // Iterate each list item and add the button to items with block-ids
+
+        if (section.type === "list") {
+            section.items.forEach((item, index: number) => {
+                const buttons = val.querySelectorAll("li");
+                if (item.pos === embed.pos) {
+                    createButtonElement(app, embed, buttons[index]);
+                }
+            });
+        }
+    });
+}
+
 /**
  * Iterate through links (includes transcluded embeds) and add a block ref button if the link has an associated block ref
  *
@@ -275,59 +316,24 @@ function addBlockReferences(
  * @param   {HTMLElement}             val        HTMLElement to attach the button to
  * @param   {EmbedOrLinkItem[]}       links      Array of links and embeds from pages index
  * @param   {Section}                 section    Section object from pages index
- * @param   {HTMLELement}             embedLink  if there is an embedLink it is passed in from createPreviewView
  *
  * @return  {void}
  */
 function addLinkReferences(
     app: App,
     val: HTMLElement,
-    links: EmbedOrLinkItem[],
-    section: Section,
-    embedLinks: NodeListOf<Element>
+    links: TransformedCachedItem[],
+    section: Section
 ): void {
     links.forEach((link) => {
         if (section.type === "paragraph" && section.pos === link.pos) {
-            embedLinks &&
-                embedLinks.forEach((embedLink) => {
-                    link &&
-                        embedLink &&
-                        // need to delay a bit until the embed is loaded into the view
-                        setTimeout(() => {
-                            createButtonElement(
-                                app,
-                                link,
-                                embedLink.firstChild as HTMLElement
-                            );
-                        }, 1);
-                });
-            if (link && !link.embed) {
-                createButtonElement(app, link, val);
-            }
+            createButtonElement(app, link, val);
         }
         // Have to iterate list items so the button gets attached to the right element
         if (section.type === "list") {
             section.items.forEach((item, index: number) => {
                 const buttons = val.querySelectorAll("li");
-                embedLinks &&
-                    embedLinks.forEach((embedLink) => {
-                        if (
-                            link &&
-                            embedLink &&
-                            item.id === link.key
-                        ) {
-                            setTimeout(() => {
-                                createButtonElement(
-                                    app,
-                                    link,
-                                    embedLink.firstChild as HTMLElement
-                                );
-                            }, 1);
-                        }
-                    });
-                if (link && !link.embed && item.pos === link.pos) {
-                    // change the type from link to block so createButtonElement adds the button to the right place
-
+                if (item.pos === link.pos) {
                     createButtonElement(app, link, buttons[index]);
                 }
             });
@@ -349,11 +355,11 @@ function addLinkReferences(
 function addHeaderReferences(
     app: App,
     val: HTMLElement,
-    headings: Heading[],
+    headings: TransformedCachedItem[],
     section: Section
 ): void {
     if (headings) {
-        headings.forEach((header: Heading) => {
+        headings.forEach((header: TransformedCachedItem) => {
             header.pos === section.pos && createButtonElement(app, header, val);
         });
     }
@@ -370,7 +376,7 @@ function addHeaderReferences(
  */
 function createButtonElement(
     app: App,
-    block: Block | Heading,
+    block: TransformedCachedItem,
     val: HTMLElement
 ): void {
     if (val) {
@@ -389,9 +395,7 @@ function createButtonElement(
         const { tableType } = getSettings();
 
         if (tableType === "basic") {
-            const refs = block.references
-                ? block.references
-                : undefined;
+            const refs = block.references ? block.references : undefined;
             const refTable: HTMLElement = createTable(app, val, refs);
             countEl.on("click", "button", () => {
                 if (!val.children.namedItem("ref-table")) {
@@ -407,6 +411,7 @@ function createButtonElement(
         }
         if (tableType === "search") {
             countEl.on("click", "button", async () => {
+                console.log(block.type, block.key);
                 const searchEnabled =
                     app.internalPlugins.getPluginById("global-search").enabled;
                 if (!searchEnabled) {
@@ -415,13 +420,67 @@ function createButtonElement(
                     const tempLeaf = app.workspace.getRightLeaf(false);
                     //Hide the leaf/pane so it doesn't show up in the right sidebar
                     tempLeaf.tabHeaderEl.hide();
-                    const blockKeyEsc = regexEscape(block.key);
-                    const blockPageEsc = regexEscape(block.page);
-                    const blockKeyClean = block.key
+                    let page;
+                    let firstReference;
+                    let secondReference;
+
+                    if (block.type === "link") {
+                        page = block.key;
+                        if (
+                            block.key.includes("#") &&
+                            !block.key.includes("#^")
+                        ) {
+                            page = block.key.split("#")[0];
+                            if (block.original) {
+                                firstReference = `/^#{1,6} ${regexEscape(
+                                    block.original
+                                )}$/`;
+                            } else {
+                                firstReference = `/^#{1,6} ${regexEscape(
+                                    block.key
+                                )}$/`;
+                            }
+                        }
+                        if (block.key.includes("#^")) {
+                            console.log("is " + block.key);
+                            firstReference = `"^${block.key.split("#^")[1]}"`;
+                            if (block.key.includes("|")) {
+                                firstReference = `${
+                                    firstReference.split("|")[0]
+                                }"`;
+                            }
+                        }
+                        if (!firstReference) {
+                            firstReference = "";
+                        }
+                        secondReference = `"[[${block.key}]]"`;
+                        if (block.key.includes("|")) {
+                            secondReference =
+                                secondReference +
+                                ` OR "[[${block.key.split("|")[0]}]]"`;
+                        } else {
+                            secondReference =
+                                secondReference + ` OR "[[${block.key}|"`;
+                        }
+                    }
+                    if (block.type === "header") {
+                        page = block.page;
+                        firstReference = `/^#{1,6} ${regexEscape(
+                            block.original
+                        )}$/`;
+                        secondReference = `/#${block.key}]]/`;
+                    }
+                    if (block.type === "block") {
+                        page = block.page;
+                        firstReference = `"^${block.key}"`;
+                        secondReference = firstReference;
+                    }
+                    const searchQuery = `(file:("${page}.md") ${firstReference}) OR (${secondReference}) `;
+                    console.log(searchQuery);
                     await tempLeaf.setViewState({
                         type: "search-ref",
                         state: {
-                            query: `(file:("${blockPageEsc}.md") (/ \\^${blockKeyEsc}$/ OR /#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /#+ ${blockKeyEsc}$/ OR /\\[\\[#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/)) OR /\\[\\[${blockPageEsc}#\\^${blockKeyEsc}(\\]\\]|\\|.*\\]\\])/ OR /\\[\\[${blockPageEsc}#${blockKeyClean}(\\]\\]|\\|.*\\]\\])/`,
+                            query: searchQuery,
                         },
                     });
                     const search = app.workspace.getLeavesOfType("search-ref");
@@ -451,7 +510,8 @@ function createButtonElement(
                     if (!val.children.namedItem("search-ref")) {
                         search[search.length - 1].view.searchQuery;
                         // depending on the type of block the search view needs to be inserted into the DOM at different points
-                        block.type === "block" && val.appendChild(searchElement);
+                        block.type === "block" &&
+                            val.appendChild(searchElement);
                         block.type === "header" &&
                             val.appendChild(searchElement);
                         block.type === "link" && val.append(searchElement);
@@ -482,7 +542,7 @@ function createButtonElement(
     }
 }
 
-function createSearchElement(app: App, search: WorkspaceLeaf[], block: Block) {
+function createSearchElement(app: App, search: WorkspaceLeaf[], block: TransformedCachedItem) {
     const searchElement = search[search.length - 1].view.containerEl;
     const normalizedKey = normalize(block.key);
     searchElement.setAttribute("data-block-ref-id", normalizedKey);
@@ -508,7 +568,7 @@ function createSearchElement(app: App, search: WorkspaceLeaf[], block: Block) {
 function createTable(
     app: App,
     val: HTMLElement,
-    refs: Reference[]
+    refs: Link[]
 ): HTMLElement {
     const refTable = createEl("table", { cls: "ref-table" });
     refTable.setAttribute("id", "ref-table");
@@ -532,7 +592,10 @@ function createTable(
         refs.forEach(async (ref) => {
             const lineContent = await app.vault
                 .cachedRead(ref.sourceFile)
-                .then((content) => content.split("\n")[ref.reference.position.start.line]);
+                .then(
+                    (content) =>
+                        content.split("\n")[ref.reference.position.start.line]
+                );
             const row = createEl("tr");
             const noteCell = createEl("td");
             const lineCell = createEl("td");
@@ -575,29 +638,11 @@ function unloadSearchViews(app: App): void {
         .forEach((leaf: WorkspaceLeaf) => leaf.detach());
 }
 
-function regexEscape(regexString: string) {
-    return regexString.replace(/(\[|\]|\^|\*|\||\(|\)|\.)/g, "\\$1");
+function regexEscape(string: string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
-
 
 const normalize = (str: string) => {
     return str.replace(/\s+|'/g, "").toLowerCase();
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isEqual = (a: any, b: any) => {
-    if (a === b) return true;
-    if (a == null || b == null) return false;
-    if (a.constructor !== b.constructor) return false;
-    const keys = Object.keys(a);
-    const length = keys.length;
-    if (length !== Object.keys(b).length) return false;
-    for (let i = 0; i < length; i++) {
-        if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
-        if (a[keys[i]] === b[keys[i]] || isEqual(a[keys[i]], b[keys[i]]))
-            return true;
-    }
-    return true;
 };
 
