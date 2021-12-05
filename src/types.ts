@@ -46,6 +46,17 @@ declare module "obsidian" {
             }
         }
     }
+    interface MetadataCache {
+        metadataCache: {
+            [x: string]: CachedMetadata
+        }
+        getLinks: () => {
+            [key: string]: {
+                link: string
+                position: Pos
+            }
+        }
+    }
 }
 
 export interface Link {

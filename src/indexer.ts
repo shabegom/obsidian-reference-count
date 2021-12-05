@@ -1,9 +1,12 @@
 import {
     App,
+    CachedMetadata,
+    HeadingCache,
     ListItemCache,
     SectionCache,
     stripHeading,
     TFile,
+    Pos,
 } from "obsidian";
 import { Link, ListItem, Section, TransformedCache } from "./types";
 
@@ -17,7 +20,11 @@ export function buildLinksAndReferences(app: App): void {
                 acc: { [x: string]: Link[] },
                 link: Link
             ): { [x: string]: Link[] } => {
-                const key = link.reference.link;
+                let key = link.reference.link;
+                if (key.includes("/")) {
+                    const keyArr = key.split("/");
+                    key = keyArr[keyArr.length - 1];
+                }
                 if (!acc[key]) {
                     acc[key] = [];
                 }
@@ -28,6 +35,51 @@ export function buildLinksAndReferences(app: App): void {
             },
             {}
         );
+    const allLinks = Object.entries(app.metadataCache.getLinks()).reduce(
+        (acc, [key, links]) => {
+            links.forEach(
+                (link: {
+                    link: string;
+                    original: string;
+                    position: Pos;
+                }): void => {
+                    if (
+                        link.original.startsWith("[[#") ||
+                        link.original.startsWith("![[#")
+                    ) {
+                        const newLink: Link = {
+                            reference: {
+                                link: link.link,
+                                displayText: link.link,
+                                position: link.position,
+                            },
+                            resolvedFile: app.vault.getAbstractFileByPath(
+                                key
+                            ) as TFile,
+                            resolvedPaths: [link.link],
+                            sourceFile: app.vault.getAbstractFileByPath(
+                                key
+                            ) as TFile,
+                        };
+                        acc.push(newLink);
+                    }
+                }
+            );
+            return acc;
+        },
+        []
+    );
+    allLinks.forEach((link: Link) => {
+        if (link.sourceFile) {
+            const key = `${link.sourceFile.basename}${link.reference.link}`;
+            if (!refs[key]) {
+                refs[key] = [];
+            }
+            if (refs[key]) {
+                refs[key].push(link);
+            }
+        }
+    });
     references = refs;
 }
 
@@ -39,6 +91,17 @@ export function getCurrentPage({
     app: App;
 }): TransformedCache {
     const cache = app.metadataCache.getFileCache(file);
+    const headings: string[] = Object.values(
+        app.metadataCache.metadataCache
+    ).reduce((acc: string[], file: CachedMetadata) => {
+        const headings = file.headings;
+        if (headings) {
+            headings.forEach((heading: HeadingCache) => {
+                acc.push(heading.heading);
+            });
+        }
+        return acc;
+    }, []);
     const transformedCache: TransformedCache = {};
     if (cache.blocks) {
         transformedCache.blocks = Object.values(cache.blocks).map((block) => ({
@@ -46,7 +109,7 @@ export function getCurrentPage({
             pos: block.position.start.line,
             page: file.basename,
             type: "block",
-            references: references[`${file.basename}#^${block.id}`],
+            references: references[`${file.basename}#^${block.id}`] || [],
         }));
     }
     if (cache.headings) {
@@ -64,7 +127,7 @@ export function getCurrentPage({
                 references:
                     references[
                         `${file.basename}#${stripHeading(header.heading)}`
-                    ],
+                    ] || [],
             })
         );
     }
@@ -75,41 +138,55 @@ export function getCurrentPage({
         );
     }
     if (cache.links) {
-        transformedCache.links = cache.links.map((link) => ({
-            key: link.link,
-            type: "link",
-            pos: link.position.start.line,
-            page: file.basename,
-            references: references[link.link],
-        }));
+        transformedCache.links = cache.links.map((link) => {
+            if (link.link.includes("/")) {
+                const keyArr = link.link.split("/");
+                link.link = keyArr[keyArr.length - 1];
+            }
+            return {
+                key: link.link,
+                type: "link",
+                pos: link.position.start.line,
+                page: file.basename,
+                references: references[link.link] || [],
+            };
+        });
         if (transformedCache.links) {
             transformedCache.links = transformedCache.links.map((link) => {
-                if (
-                    link.key.includes("#") &&
-                    !link.key.includes("#^") &&
-                    transformedCache.headings
-                ) {
-                    transformedCache.headings.forEach((header) => {
-                        if (
-                            stripHeading(header.key) ===
-                            stripHeading(link.key.split("#")[1])
-                        ) {
-                            link.original = header.original;
-                        }
-                    });
+                if (link.key.includes("/")) {
+                    const keyArr = link.key.split("/");
+                    link.key = keyArr[keyArr.length - 1];
+                }
+                if (link.key.includes("#") && !link.key.includes("#^")) {
+                    const heading = headings.filter(
+                        (heading: string) =>
+                            stripHeading(heading) === link.key.split("#")[1]
+                    )[0];
+                    link.original = heading ? heading : undefined;
+                }
+                if (link.key.startsWith("#^") || link.key.startsWith("#")) {
+                    link.key = `${link.page}${link.key}`;
+                    link.references = references[link.key] || [];
                 }
                 return link;
             });
         }
     }
+
     if (cache.embeds) {
-        transformedCache.embeds = cache.embeds.map((embed) => ({
-            key: embed.link,
-            page: file.basename,
-            type: "link",
-            pos: embed.position.start.line,
-            references: references[embed.link],
-        }));
+        transformedCache.embeds = cache.embeds.map((embed) => {
+            if (embed.link.includes("/")) {
+                const keyArr = embed.link.split("/");
+                embed.link = keyArr[keyArr.length - 1];
+            }
+            return {
+                key: embed.link,
+                page: file.basename,
+                type: "link",
+                pos: embed.position.start.line,
+                references: references[embed.link] || [],
+            };
+        });
         if (transformedCache.embeds) {
             transformedCache.embeds = transformedCache.embeds.map((embed) => {
                 if (
@@ -117,14 +194,16 @@ export function getCurrentPage({
                     !embed.key.includes("#^") &&
                     transformedCache.headings
                 ) {
-                    transformedCache.headings.forEach((header) => {
-                        if (
-                            stripHeading(header.key) ===
-                            stripHeading(embed.key.split("#")[1])
-                        ) {
-                            embed.original = header.original;
-                        }
-                    });
+                    const heading = headings.filter((heading: string) =>
+                        heading.includes(embed.key.split("#")[1])
+                    )[0];
+
+                    embed.original = heading ? heading : undefined;
+                }
+
+                if (embed.key.startsWith("#^") || embed.key.startsWith("#")) {
+                    embed.key = `${file.basename}${embed.key}`;
+                    embed.references = references[embed.key] || [];
                 }
                 return embed;
             });

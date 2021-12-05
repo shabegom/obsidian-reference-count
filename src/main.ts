@@ -44,18 +44,18 @@ export default class BlockRefCounter extends Plugin {
             () => {
                 buildLinksAndReferences(this.app);
             },
-            1000,
+            3000,
             true
         );
         const previewDebounce = debounce(
             () => {
-                createPreviewView(this.app);
+                createPreviewView(this.app, this.page);
             },
             100,
             true
         );
         buildLinksAndReferences(this.app);
-        createPreviewView(this.app);
+        createPreviewView(this.app, this.page);
 
         /**
          * Fire the initial indexing only if layoutReady = true
@@ -66,11 +66,11 @@ export default class BlockRefCounter extends Plugin {
             this.resolved = this.app.metadataCache.on("resolved", () => {
                 this.app.metadataCache.offref(this.resolved);
                 buildLinksAndReferences(this.app);
-                createPreviewView(this.app);
+                createPreviewView(this.app, this.page);
             });
         } else {
             buildLinksAndReferences(this.app);
-            createPreviewView(this.app);
+            createPreviewView(this.app, this.page);
         }
 
         this.registerView("search-ref", (leaf: WorkspaceLeaf) => {
@@ -103,12 +103,6 @@ export default class BlockRefCounter extends Plugin {
             })
         );
 
-        this.registerEvent(
-            this.app.workspace.on("active-leaf-change", () => {
-                indexDebounce();
-                previewDebounce();
-            })
-        );
 
         this.registerEvent(
             this.app.workspace.on("file-open", (file): void => {
@@ -162,12 +156,12 @@ export default class BlockRefCounter extends Plugin {
  * @return  {void}
  */
 
-function createPreviewView(app: App): void {
+function createPreviewView(app: App, page: TransformedCache): void {
     const activeView = app.workspace.getActiveViewOfType(
         MarkdownView as unknown as Constructor<View>
     );
     if (activeView) {
-        const page = getCurrentPage({ file: activeView.file, app });
+        page = page || getCurrentPage({ file: activeView.file, app });
         try {
             activeView.previewMode?.renderer.onRendered(() => {
                 // if previewMode exists and has sections, get the sections
@@ -211,7 +205,7 @@ function processPage(
                     (settings.displayParent &&
                         page.blocks &&
                         !hasEmbed &&
-                        type === "paragraph") ||
+                    type === "paragraph") ||
                     type === "list" ||
                     type === "blockquote" ||
                     type === "code"
@@ -225,7 +219,6 @@ function processPage(
                 ) {
                     addHeaderReferences(app, el, page.headings, pageSection);
                 }
-
                 if (settings.displayChild && page.links) {
                     addLinkReferences(app, el, page.links, pageSection);
                 }
@@ -251,33 +244,38 @@ function processPage(
 function addBlockReferences(
     app: App,
     val: HTMLElement,
-    blocks: TransformedCache["blocks"],
+    blocks: TransformedCache["headings"],
     section: Section
 ): void {
-    blocks &&
-        blocks.forEach((block) => {
-            if (block.key === section.id) {
-                if (section.type === "paragraph") {
-                    createButtonElement(app, block, val);
-                }
-
-                if (section.type === "blockquote" || section.type === "code") {
-                    createButtonElement(app, block, val);
-                }
-            }
-
-            // Iterate each list item and add the button to items with block-ids
-
-            if (section.type === "list") {
-                section.items.forEach((item, index: number) => {
-                    const buttons = val.querySelectorAll("li");
-                    block.type = "block-list";
-                    if (item.id === block.key) {
-                        createButtonElement(app, block, buttons[index]);
+    if (section.id) {
+        blocks &&
+            blocks.forEach((block) => {
+                if (block.key === section.id) {
+                    if (section.type === "paragraph") {
+                        createButtonElement(app, block, val);
                     }
-                });
-            }
-        });
+
+                    if (
+                        section.type === "blockquote" ||
+                        section.type === "code"
+                    ) {
+                        createButtonElement(app, block, val);
+                    }
+                }
+
+                // Iterate each list item and add the button to items with block-ids
+
+                if (section.type === "list") {
+                    section.items.forEach((item, index: number) => {
+                        const buttons = val.querySelectorAll("li");
+                        if (item.id === block.key) {
+                            block.type = "block-list";
+                            createButtonElement(app, block, buttons[index]);
+                        }
+                    });
+                }
+            });
+    }
 }
 
 function addEmbedReferences(
@@ -433,6 +431,10 @@ function createButtonElement(
                     let secondReference;
 
                     if (block.type === "link" || block.type === "link-list") {
+                        if (block.key.includes("/")) {
+                            const keyArr = block.key.split("/");
+                            block.key = keyArr[keyArr.length - 1];
+                        }
                         page = block.key;
                         if (
                             block.key.includes("#") &&
@@ -446,26 +448,28 @@ function createButtonElement(
                             } else {
                                 firstReference = `/^#{1,6} ${regexEscape(
                                     block.key.split("#")[1]
-                                )}$/`;
+                                )}/`;
                             }
+                            secondReference = `/#${block.key.split("#")[1]}]]/`;
                         }
                         if (block.key.includes("#^")) {
                             page = block.key.split("#^")[0];
-                            firstReference = `^${block.key.split("#^")[1]}`;
+                            firstReference = `"^${block.key.split("#^")[1]}"`;
                             if (block.key.includes("|")) {
                                 firstReference = `${
                                     firstReference.split("|")[0]
                                 }"`;
                             }
+                            secondReference = `"#^${block.key.split("#^")[1]}"`;
                         }
                         if (!firstReference) {
                             firstReference = "";
+                            secondReference = `"[[${block.key}]]"`;
                         }
-                        secondReference = `"[[${block.key}]]"`;
                         if (block.key.includes("|")) {
                             secondReference =
                                 secondReference +
-                                ` OR "[[${block.key.split("|")[0]}]]"`;
+                                ` OR "${block.key.split("|")[0]}]]"`;
                         } else {
                             secondReference =
                                 secondReference + ` OR "[[${block.key}|"`;
@@ -481,8 +485,7 @@ function createButtonElement(
                     if (block.type === "block" || block.type === "block-list") {
                         page = block.page;
                         firstReference = `"^${block.key}"`;
-                        secondReference = firstReference;
-                    }
+                        secondReference = `"${block.page}#^${block.key}"`;                    }
                     const searchQuery = `(file:("${page}.md") ${firstReference}) OR (${secondReference}) `;
                     await tempLeaf.setViewState({
                         type: "search-ref",
@@ -522,7 +525,7 @@ function createButtonElement(
                         block.type === "header" &&
                             val.appendChild(searchElement);
                         block.type === "link" && val.append(searchElement);
-                        block.type.includes("list")&&
+                        block.type.includes("list") &&
                             val.insertBefore(searchElement, val.children[2]);
                     } else {
                         if (val.children.namedItem("search-ref")) {
