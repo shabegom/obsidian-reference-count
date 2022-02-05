@@ -94,6 +94,7 @@ export interface TransformedCache {
 
 export interface ListItem extends ListItemCache {
     pos: number
+    key: string
 }
 
 export interface Section {

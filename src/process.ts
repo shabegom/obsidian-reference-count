@@ -177,10 +177,13 @@ function addBlockReferences(
                 // Iterate each list item and add the button to items with block-ids
 
                 if (section.type === "list") {
-                    section.items.forEach((item ) => {
+                    section.items.forEach((item) => {
                         if (item.id === block.key) {
                             block.type = "block-list";
-                            blockButtons.push({ block, val: document.createElement("div") });
+                            blockButtons.push({
+                                block,
+                                val: document.createElement("div"),
+                            });
                         }
                     });
                 }
@@ -210,11 +213,13 @@ function addEmbedReferences(
         // Iterate each list item and add the button to items with block-ids
 
         if (section.type === "list") {
-            section.items.forEach((item, index: number) => {
-                const buttons = val.querySelectorAll("li");
-                if (item.pos === embed.pos.start.line) {
+            section.items.forEach((item) => {
+                if (item.key === embed.key && item.position.start.line === embed.pos.start.line) {
                     embed.type = "link-list";
-                    embedButtons.push({ block: embed, val: buttons[index] });
+                    embedButtons.push({
+                        block: embed,
+                        val: document.createElement("div"),
+                    });
                 }
             });
         }
