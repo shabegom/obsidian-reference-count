@@ -34,6 +34,9 @@ declare module "obsidian" {
     }
     interface View {
         searchQuery: string
+        currentMode: {
+            type: string
+        }
         file: TFile
         previewMode: {
             renderer: {
@@ -73,7 +76,7 @@ export interface Link {
 
 export interface TransformedCachedItem {
     key: string
-    pos: number
+    pos: Pos
     page: string
     type: string
     references: Link[]
@@ -91,6 +94,7 @@ export interface TransformedCache {
 
 export interface ListItem extends ListItemCache {
     pos: number
+    key: string
 }
 
 export interface Section {

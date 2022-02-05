@@ -2,8 +2,6 @@ import {
     App,
     CachedMetadata,
     HeadingCache,
-    ListItemCache,
-    SectionCache,
     stripHeading,
     TFile,
     Pos,
@@ -91,6 +89,9 @@ export function getCurrentPage({
     app: App;
 }): TransformedCache {
     const cache = app.metadataCache.getFileCache(file);
+    if (!references) {
+        buildLinksAndReferences(app);
+    }
     const headings: string[] = Object.values(
         app.metadataCache.metadataCache
     ).reduce((acc: string[], file: CachedMetadata) => {
@@ -106,7 +107,7 @@ export function getCurrentPage({
     if (cache.blocks) {
         transformedCache.blocks = Object.values(cache.blocks).map((block) => ({
             key: block.id,
-            pos: block.position.start.line,
+            pos: block.position,
             page: file.basename,
             type: "block",
             references: references[`${file.basename}#^${block.id}`] || [],
@@ -116,11 +117,11 @@ export function getCurrentPage({
         transformedCache.headings = cache.headings.map(
             (header: {
                 heading: string;
-                position: { start: { line: number } };
+                position: Pos;
             }) => ({
                 original: header.heading,
                 key: stripHeading(header.heading),
-                pos: header.position.start.line,
+                pos: header.position,
 
                 page: file.basename,
                 type: "header",
@@ -133,8 +134,7 @@ export function getCurrentPage({
     }
     if (cache.sections) {
         transformedCache.sections = createListSections(
-            cache.sections,
-            cache.listItems
+            cache
         );
     }
     if (cache.links) {
@@ -146,7 +146,7 @@ export function getCurrentPage({
             return {
                 key: link.link,
                 type: "link",
-                pos: link.position.start.line,
+                pos: link.position,
                 page: file.basename,
                 references: references[link.link] || [],
             };
@@ -183,7 +183,7 @@ export function getCurrentPage({
                 key: embed.link,
                 page: file.basename,
                 type: "link",
-                pos: embed.position.start.line,
+                pos: embed.position,
                 references: references[embed.link] || [],
             };
         });
@@ -223,20 +223,28 @@ export function getCurrentPage({
  */
 
 function createListSections(
-    sections: SectionCache[],
-    listItems: ListItemCache[]
+    cache: CachedMetadata
 ): Section[] {
-    if (listItems) {
-        return sections.map((section) => {
+    if (cache.listItems) {
+        return cache.sections.map((section) => {
             const items: ListItem[] = [];
             if (section.type === "list") {
-                listItems.forEach((item: ListItem) => {
+                cache.listItems.forEach((item: ListItem) => {
                     if (
                         item.position.start.line >=
                             section.position.start.line &&
                         item.position.start.line <= section.position.end.line
                     ) {
-                        items.push({ pos: item.position.start.line, ...item });
+                        const id = cache.embeds.find(
+                            (embed) =>
+                                embed.position.start.line ===
+                                item.position.start.line
+                        )?.link || cache.links.find(
+                            (link) =>
+                                link.position.start.line ===
+                                item.position.start.line
+                        )?.link || "";
+                        items.push({ key: id, pos: item.position, ...item });
                     }
                 });
                 const sectionWithItems = { items, ...section };
@@ -246,5 +254,5 @@ function createListSections(
         });
     }
 
-    return sections;
+    return cache.sections;
 }

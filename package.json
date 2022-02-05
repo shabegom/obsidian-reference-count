@@ -1,11 +1,13 @@
 {
     "name": "block-ref-counts",
-    "version": "0.2.0",
+    "version": "0.4.0",
     "description": "count block references in obsidian vault",
     "main": "main.js",
     "scripts": {
-        "dev": "rollup --config rollup.config.js -w",
-        "build": "rollup --config rollup.config.js --environment BUILD:production"
+        "dev": "node esbuild.config.mjs",
+        "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+        "version": "node version-bump.mjs && git add manifest.json versions.json",
+        "cp": "cp ./main.js ~/plugin-development/.obsidian/plugins/ref-count/"
     },
     "keywords": [],
     "author": "",
@@ -18,13 +20,16 @@
         "@types/workerpool": "^6.1.0",
         "@typescript-eslint/eslint-plugin": "^4.24.0",
         "@typescript-eslint/parser": "^4.24.0",
+        "builtin-modules": "^3.2.0",
+        "esbuild": "0.13.12",
         "eslint": "^7.27.0",
-        "obsidian": "^0.12.16",
+        "obsidian": "^0.13.21",
         "rollup": "^2.32.1",
         "rollup-plugin-web-worker-loader": "^1.6.1",
         "tslib": "^2.2.0",
         "typescript": "^4.2.4"
     },
     "dependencies": {
+        "@codemirror/language": "^0.19.7"
     }
 }
