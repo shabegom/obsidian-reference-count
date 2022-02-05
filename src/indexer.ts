@@ -91,6 +91,9 @@ export function getCurrentPage({
     app: App;
 }): TransformedCache {
     const cache = app.metadataCache.getFileCache(file);
+    if (!references) {
+        buildLinksAndReferences(app);
+    }
     const headings: string[] = Object.values(
         app.metadataCache.metadataCache
     ).reduce((acc: string[], file: CachedMetadata) => {
@@ -106,7 +109,7 @@ export function getCurrentPage({
     if (cache.blocks) {
         transformedCache.blocks = Object.values(cache.blocks).map((block) => ({
             key: block.id,
-            pos: block.position.start.line,
+            pos: block.position,
             page: file.basename,
             type: "block",
             references: references[`${file.basename}#^${block.id}`] || [],
@@ -116,11 +119,11 @@ export function getCurrentPage({
         transformedCache.headings = cache.headings.map(
             (header: {
                 heading: string;
-                position: { start: { line: number } };
+                position: Pos;
             }) => ({
                 original: header.heading,
                 key: stripHeading(header.heading),
-                pos: header.position.start.line,
+                pos: header.position,
 
                 page: file.basename,
                 type: "header",
@@ -146,7 +149,7 @@ export function getCurrentPage({
             return {
                 key: link.link,
                 type: "link",
-                pos: link.position.start.line,
+                pos: link.position,
                 page: file.basename,
                 references: references[link.link] || [],
             };
@@ -183,7 +186,7 @@ export function getCurrentPage({
                 key: embed.link,
                 page: file.basename,
                 type: "link",
-                pos: embed.position.start.line,
+                pos: embed.position,
                 references: references[embed.link] || [],
             };
         });
@@ -236,7 +239,7 @@ function createListSections(
                             section.position.start.line &&
                         item.position.start.line <= section.position.end.line
                     ) {
-                        items.push({ pos: item.position.start.line, ...item });
+                        items.push({ pos: item.position, ...item });
                     }
                 });
                 const sectionWithItems = { items, ...section };
