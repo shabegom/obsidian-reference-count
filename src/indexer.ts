@@ -235,11 +235,11 @@ function createListSections(
                             section.position.start.line &&
                         item.position.start.line <= section.position.end.line
                     ) {
-                        const id = cache.embeds.find(
+                        const id = cache.embeds?.find(
                             (embed) =>
                                 embed.position.start.line ===
                                 item.position.start.line
-                        )?.link || cache.links.find(
+                        )?.link || cache.links?.find(
                             (link) =>
                                 link.position.start.line ===
                                 item.position.start.line
