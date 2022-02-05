@@ -37,12 +37,13 @@ class ButtonWidget extends WidgetType {
 function buttons(plugin: BlockRefCounter, view: EditorView) {
     const buttons = plugin.createPreview(plugin);
     const note = plugin.app.workspace.getActiveFile().basename;
-    const widgets: Range<Decoration>[] = [];
+    let widgets: Range<Decoration>[] = [];
     for (const { from, to } of view.visibleRanges) {
         for (const button of buttons) {
             if (
                 button.block.pos.start.offset >= from &&
                 button.block.pos.end.offset <= to &&
+                button.block.references &&
                 button.block.references.length > 0 &&
                 button.block.page === note
             ) {
@@ -56,6 +57,16 @@ function buttons(plugin: BlockRefCounter, view: EditorView) {
             }
         }
     }
+    widgets = widgets.sort((a, b) => a.from - b.from).reduce((acc, widget) => {
+        if (acc.length === 0) {
+            return [widget];
+        }
+        const last = acc[acc.length - 1];
+        if (last.from === widget.from) {
+            return acc;
+        }
+        return [...acc, widget];
+    }, []);
     return Decoration.set(widgets);
 }
 
