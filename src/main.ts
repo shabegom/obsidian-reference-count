@@ -12,6 +12,7 @@ import { TransformedCache, TransformedCachedItem } from "./types";
 import { buildLinksAndReferences, getCurrentPage } from "./indexer";
 import {
     BlockRefCountSettingTab,
+    BlockRefCountSettings,
     getSettings,
     updateSettings,
 } from "./settings";
@@ -34,6 +35,7 @@ export default class BlockRefCounter extends Plugin {
         val?: HTMLElement;
     }[] = [];
     public createPreview = createPreviewView;
+    public settings: BlockRefCountSettings;
 
     async onload(): Promise<void> {
         console.log("loading plugin: Block Reference Counter");
@@ -63,18 +65,56 @@ export default class BlockRefCounter extends Plugin {
          * avoids trying to create an index while obsidian is indexing files
          */
         this.app.workspace.onLayoutReady(() => {
+            this.settings = getSettings();
             unloadSearchViews(this.app);
             const resolved = this.app.metadataCache.on("resolved", () => {
                 this.app.metadataCache.offref(resolved);
-                buildLinksAndReferences(this.app);
-                this.buttons = createPreviewView(this);
-                const activeView = this.app.workspace.getActiveViewOfType(
-                    MarkdownView as unknown as Constructor<View>
-                );
-                if (activeView) {
-                    const file = activeView.file;
-                    this.page = getCurrentPage({ file, app: this.app });
+                if (this.settings.indexOnVaultOpen) {
+                    buildLinksAndReferences(this.app);
+                    this.buttons = createPreviewView(this);
+                    const activeView = this.app.workspace.getActiveViewOfType(
+                        MarkdownView as unknown as Constructor<View>
+                    );
+                    if (activeView) {
+                        const file = activeView.file;
+                        this.page = getCurrentPage({ file, app: this.app });
+                    }
                 }
+
+                this.registerEvent(
+                    this.app.vault.on("delete", () => {
+                        indexDebounce();
+                    })
+                );
+
+                this.registerEvent(
+                    this.app.workspace.on("layout-change", () => {
+                        if (this.settings.indexOnLayoutChange) {
+                            indexDebounce();
+                            previewDebounce();
+                        }
+                    })
+                );
+
+                this.registerEvent(
+                    this.app.workspace.on("file-open", (file): void => {
+                        if (this.settings.indexOnFileOpen) {
+                            indexDebounce();
+                            this.page = getCurrentPage({ file, app: this.app });
+                            previewDebounce();
+                        }
+                    })
+                );
+
+                this.registerEvent(
+                    this.app.metadataCache.on("resolve", (file) => {
+                        if (this.settings.indexOnFileChange) {
+                            indexDebounce();
+                            this.page = getCurrentPage({ file, app: this.app });
+                            previewDebounce();
+                        }
+                    })
+                );
                 this.registerEditorExtension([
                     blockRefCounterPlugin(this),
                     referencesField,
@@ -95,38 +135,6 @@ export default class BlockRefCounter extends Plugin {
         //        *
         // Event listeners to re-index notes if the cache changes or a note is deleted
         // triggers creation of block ref buttons on the preview view
-
-        this.registerEvent(
-            this.app.vault.on("delete", () => {
-                indexDebounce();
-            })
-        );
-
-        //       *
-        // Event listeners for layout changes to update the preview view with a block ref count button
-        //
-        this.registerEvent(
-            this.app.workspace.on("layout-change", () => {
-                indexDebounce();
-                previewDebounce();
-            })
-        );
-
-        this.registerEvent(
-            this.app.workspace.on("file-open", (file): void => {
-                indexDebounce();
-                this.page = getCurrentPage({ file, app: this.app });
-                previewDebounce();
-            })
-        );
-
-        this.registerEvent(
-            this.app.metadataCache.on("resolve", (file) => {
-                indexDebounce();
-                this.page = getCurrentPage({ file, app: this.app });
-                previewDebounce();
-            })
-        );
 
         this.registerMarkdownPostProcessor((el, ctx) => {
             const sectionInfo = ctx.getSectionInfo(el);

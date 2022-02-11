@@ -88,13 +88,14 @@ export function processPage(
                 const embeds = el.querySelectorAll(".internal-embed");
                 const hasEmbed = embeds.length > 0 ? true : false;
                 if (
-                    (settings.displayParent &&
-                        page.blocks &&
-                        !hasEmbed &&
-                        type === "paragraph") ||
-                    type === "list" ||
-                    type === "blockquote" ||
-                    type === "code"
+                    settings.displayParent &&
+                    settings.displayBlocks &&
+                    page.blocks &&
+                    !hasEmbed &&
+                    (type === "paragraph" ||
+                        type === "list" ||
+                        type === "blockquote" ||
+                        type === "code")
                 ) {
                     const blockButtons = addBlockReferences(
                         el,
@@ -105,6 +106,7 @@ export function processPage(
                 }
                 if (
                     settings.displayParent &&
+                    settings.displayHeadings &&
                     page.headings &&
                     type === "heading"
                 ) {
@@ -115,7 +117,11 @@ export function processPage(
                     );
                     buttons.push(...headerButtons);
                 }
-                if (settings.displayChild && page.links) {
+                if (
+                    settings.displayChild &&
+                    settings.displayLinks &&
+                    page.links
+                ) {
                     const linkButtons = addLinkReferences(
                         el,
                         page.links,
@@ -123,7 +129,11 @@ export function processPage(
                     );
                     buttons.push(...linkButtons);
                 }
-                if (settings.displayChild && page.embeds) {
+                if (
+                    settings.displayChild &&
+                    settings.displayEmbeds &&
+                    page.embeds
+                ) {
                     const embedButtons = addEmbedReferences(
                         el,
                         page.embeds,
@@ -214,7 +224,10 @@ function addEmbedReferences(
 
         if (section.type === "list") {
             section.items.forEach((item) => {
-                if (item.key === embed.key && item.position.start.line === embed.pos.start.line) {
+                if (
+                    item.key === embed.key &&
+                    item.position.start.line === embed.pos.start.line
+                ) {
                     embed.type = "link-list";
                     embedButtons.push({
                         block: embed,
