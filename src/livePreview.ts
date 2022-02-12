@@ -127,7 +127,7 @@ class referencesWidget extends WidgetType {
     toDOM() {
         const val = document.createElement("div");
         const { tableType } = getSettings();
-        if (tableType === "table") {
+        if (tableType === "basic") {
             createRefTableElement(this.app, this.block, val);
         }
         if (tableType === "search") {
