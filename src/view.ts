@@ -57,10 +57,17 @@ export function createRefTableElement(
 ): void {
     const refs = block.references ? block.references : undefined;
     const refTable: HTMLElement = createTable(app, refs);
-    block.type === "block" && val.appendChild(refTable);
-    block.type === "header" && val.appendChild(refTable);
-    block.type === "link" && val.append(refTable);
-    block.type.includes("list") && val.insertBefore(refTable, val.children[2]);
+    if (!val.children.namedItem("ref-table")) {
+        block.type === "block" && val.appendChild(refTable);
+        block.type === "header" && val.appendChild(refTable);
+        block.type === "link" && val.append(refTable);
+        block.type.includes("list") &&
+            val.insertBefore(refTable, val.children[2]);
+    } else {
+        if (val.children.namedItem("ref-table")) {
+            val.removeChild(refTable);
+        }
+    }
 }
 
 function buildSearchQuery(block: TransformedCachedItem): string {
@@ -165,7 +172,11 @@ export async function createSearchElement(
     }
 }
 
-function createSearch(search: WorkspaceLeaf[], block: TransformedCachedItem) {
+
+function createSearch(
+    search: WorkspaceLeaf[],
+    block: TransformedCachedItem
+) {
     const searchElement = search[search.length - 1].view.containerEl;
     const normalizedKey = normalize(block.key);
     searchElement.setAttribute("data-block-ref-id", normalizedKey);
