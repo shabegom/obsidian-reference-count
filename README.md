@@ -6,6 +6,8 @@ There are some known problems with this plugin. I don't have time to address the
 - [#49](https://github.com/shabegom/obsidian-reference-count/issues/49) People report that this plugin causes lag in their vault. It seems to impact vaults with a large amount of references. There are a couple of settings to try and reduce the amount of indexing that happens.
 - [#66](https://github.com/shabegom/obsidian-reference-count/issues/66) There is a report that using Absolute Path links and this plugin causes renaming links to break in a pretty bad way. **If you use Absolute Path links I would not use this plugin at this time**.  
 
+If you run into a bug, please submit an issue. If you have any questions reach out to @shabegom on the obsidian Discord.  
+
 ![](img/readme.png)
 
 Show the amount of references you have in:
@@ -21,10 +23,6 @@ There are settings if you want counts to show up on parents, or children, or bot
 ## Install
 
 Now available in Community Plugins!
-
-## Issues
-
-If you run into a bug, please submit an issue. If you have any questions reach out to @shabegom on the obsidian Discord.
 
 ## Changelog
 
