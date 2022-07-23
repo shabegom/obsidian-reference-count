@@ -1,6 +1,11 @@
 # Obsidian Block Reference Counts
 **By shabegom**
 
+## Known Issues
+There are some known problems with this plugin. I don't have time to address them. PRs welcome:  
+- #49 People report that this plugin causes lag in their vault. It seems to impact vaults with a large amount of references. There are a couple of settings to try and reduce the amount of indexing that happens.
+- #66 There is a report that using Absolute Path links and this plugin causes renaming links to break in a pretty bad way. If you use Absolute Path links I would not use this plugin at this time.  
+
 ![](img/readme.png)
 
 Show the amount of references you have in:
