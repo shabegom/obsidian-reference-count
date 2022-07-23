@@ -1,6 +1,8 @@
 # Obsidian Block Reference Counts
 **By shabegom**
 
+**I would definitely check out [Strange New Worlds](https://github.com/TfTHacker/obsidian42-strange-new-worlds) instead of this plugin. Strange New Worlds seems a lot niced.**
+
 ## Known Issues
 There are some known problems with this plugin. I don't have time to address them. PRs welcome:  
 - [#49](https://github.com/shabegom/obsidian-reference-count/issues/49) People report that this plugin causes lag in their vault. It seems to impact vaults with a large amount of references. There are a couple of settings to try and reduce the amount of indexing that happens.
