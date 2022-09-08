@@ -107,6 +107,8 @@ export default class BlockRefCounter extends Plugin {
             })
         );
 
+      
+
         //       *
         // Event listeners for layout changes to update the preview view with a block ref count button
         //
